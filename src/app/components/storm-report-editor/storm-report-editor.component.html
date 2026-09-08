@@ -1,0 +1,113 @@
+<div class="editor-container">
+  <div class="toolbar">
+    <button type="button" (click)="refreshData()">
+      Actualizar datos
+    </button>
+
+    <button type="button" (click)="exportPdf()">
+      Exportar a PDF
+    </button>
+  </div>
+
+  <!-- CONTENIDO DEL "WORD" -->
+  <div #reportContent class="page" [class.page-export]="isExporting">
+    <div class="image-header" *ngIf="!isExporting">
+      <img src="assets/img/report-header.png">
+    </div>
+
+    <h1 contenteditable="true" class="title1">
+      BOLETÍN DE VIGILANCIA METEOROLÓGICA
+    </h1>
+
+    <h1 contenteditable="true" class="title2">
+      Detección de zonas con potencial de lluvias significativas y tormentas eléctricas
+    </h1>
+
+    <p class="meta" contenteditable="true">
+      <strong>Fecha y hora de emisión:</strong> {{ emissionText }}<br>
+      <strong>Vigencia:</strong> {{ validityText }}
+    </p>
+
+    <p contenteditable="true" class="intro">
+      La <b>DIRECCIÓN DE PRONÓSTICOS Y ALERTAS HIDROMETEOROLÓGICAS DEL INAMHI</b>,
+      mediante el análisis de información satelital multicanal del GOES-19 y
+      herramientas de detección automática de tormentas basadas en inteligencia
+      artificial (IA), realiza el monitoreo de sistemas convectivos con potencial
+      de generar lluvias significativas y tormentas. Con base en este análisis y
+      en los productos generados por la plataforma <b>INAMHI GEOGLOWS</b>, se emite
+      el presente boletín de vigilancia meteorológica, en el cual se identifican
+      los cantones con mayor probabilidad de ocurrencia de precipitaciones
+      significativas durante el periodo de vigencia indicado.
+    </p>
+
+    <div class="image-wrapper">
+      <img *ngIf="stormImageUrl" [src]="stormImageUrl">
+      <div *ngIf="!stormImageUrl" class="placeholder">
+        Haz clic en "Actualizar datos" para cargar la imagen.
+      </div>
+    </div>
+
+
+    <table *ngIf="stormTable.length" class="storm-table">
+      <thead>
+        <tr>
+          <th>Provincia</th>
+          <th>Cantón</th>
+          <th>Nivel</th>
+          <th class="actions-col" *ngIf="!isExporting">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let row of stormTable; let i = index">
+          <td>
+            <input
+              type="text"
+              [(ngModel)]="stormTable[i].Provincia"
+              placeholder="Provincia"
+            />
+          </td>
+          <td>
+            <input
+              type="text"
+              [(ngModel)]="stormTable[i].Canton"
+              placeholder="Cantón"
+            />
+          </td>
+          <td>
+            <!-- puedes dejar input simple o usar un select -->
+            <select [(ngModel)]="stormTable[i].Nivel">
+              <option value="">Seleccionar…</option>
+              <option value="ALTO">ALTO</option>
+              <option value="MEDIO">MEDIO</option>
+            </select>
+          </td>
+          <td class="actions" *ngIf="!isExporting">
+            <button type="button" (click)="removeRow(i)">
+              ✕
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div *ngIf="!stormTable.length" class="placeholder">
+      Haz clic en "Actualizar datos" para cargar la tabla.
+    </div>
+
+    <button
+      type="button"
+      (click)="addRow()"
+      class="add-row-button"
+      *ngIf="!isExporting"
+    >
+      + Añadir fila
+    </button>
+
+
+
+    <div *ngIf="!stormTable.length" class="placeholder">
+      Haz clic en "Actualizar datos" para cargar la tabla.
+    </div>
+
+  </div>
+</div>

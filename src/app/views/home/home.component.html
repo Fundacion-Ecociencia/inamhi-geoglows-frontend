@@ -1,0 +1,82 @@
+<div>
+  <div class="header">
+    <nav class="navbar navbar-expand-md navbar-dark bg-dark"
+          [ngClass]="{'custom-navbar': !scrolled, 'custom-navbar-scrolled': scrolled}">
+      <div class="container d-flex justify-content-between">
+        <a class="navbar-brand" href="https://servicios.inamhi.gob.ec/">
+          <img
+            src="assets/img/inamhi-white-logo.png"
+            width="125"
+            class="d-inline-block align-top">
+        </a>
+        <button class="navbar-toggler"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#navbarToggle"
+                aria-controls="navbarToggle"
+                aria-expanded="false"
+                aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div
+          class="collapse navbar-collapse justify-content-end"
+          id="navbarToggle"
+          data-bs-theme="dark">
+            <div class="bg-dark" style="background-color: transparent !important;">
+              <ul class="navbar-nav">
+                <li class="nav-item active">
+                  <a class="nav-link text-center" href="/">INICIO</a>
+                </li>
+                <li class="nav-item text-center">
+                  <a class="nav-link" href="/apps">APLICACIONES</a>
+                </li>
+                <li class="nav-item text-center">
+                  <a class="nav-link" href="#">ACERCA DE</a>
+                </li>
+              </ul>
+            </div>
+        </div>
+      </div>
+    </nav>
+  </div>
+
+  <div class="position-absolute top-0 start-0 home-body">
+    <div class="position-relative home-container">
+      <div class="home-background">
+        <div class="container d-flex align-items-center h-100">
+          <div class="w-100 px-2">
+            <div class="col-12 d-flex justify-content-center">
+              <div class="home-content">
+                <div class="home-title text-center fade-in-1">INAMHI GEOGLOWS</div>
+                <br>
+                <div class="home-description text-center fade-in-2">
+                  Accede, visualiza y descarga
+                  <span class="highlight">pronósticos hidrometeorológicos</span> e
+                  <span class="highlight">información satelital</span>
+                  en Ecuador.
+                </div>
+                <br><br>
+                <div class="d-flex justify-content-center fade-in-2">
+                  <button (click)="scrollToElement()" mat-flat-button color="primary" class="home-btn home-btn-primary">
+                    <i class="fa-sharp fa-solid fa-circle-info"></i>
+                    Conoce más
+                  </button>
+                  <button (click)="githubRedirect()" mat-flat-button class="home-btn home-btn-secondary">
+                    <i class="fa-brands fa-github"></i>
+                    GitHub
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="position-absolute bottom-0 d-flex align-items-end fade-in-3">
+          <div class="d-flex justify-content-center pb-4">
+            <img src="assets/img/all-white-logos-h.png" class="servir-logo-h">
+            <img src="assets/img/all-white-logos-v.png" class="servir-logo-v">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

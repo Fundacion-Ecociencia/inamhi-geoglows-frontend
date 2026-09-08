@@ -1,0 +1,142 @@
+.editor-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.toolbar {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+
+  button {
+    padding: 0.4rem 0.8rem;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    cursor: pointer;
+  }
+}
+
+.page {
+  margin: 0 auto;
+  padding: 2rem;
+  width: 210mm;
+  min-height: 297mm;
+  background: #fff;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.2);
+  box-sizing: border-box;
+  font-family: 'Arial', serif;
+}
+.page.page-export {
+  padding-top: 0;
+}
+
+
+.image-header{
+  margin: 0;
+  text-align: center;
+
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+}
+
+.title1 {
+  text-align: center;
+  margin-bottom: 0.3rem;
+  font-size: 16px;
+  font-weight: bold;
+  color: #303393;
+}
+
+.title2 {
+  text-align: center;
+  margin-bottom: 0.3rem;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.header-date {
+  font-size: 9px;
+  text-align: center;
+}
+
+.meta {
+  font-size: 0.95rem;
+  text-align: center;
+  font-size: 13px;
+  strong {
+    font-weight: bold;
+  }
+}
+
+.intro {
+  margin-top: 0.5rem;
+  font-size: 11px;
+  text-align: justify;
+}
+
+.metric-text {
+  font-size: 10px;
+}
+
+.image-wrapper {
+  margin: 1rem 0;
+  text-align: center;
+
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+}
+
+.storm-table {
+  width: 90%;
+  border-collapse: collapse;
+  margin: auto;
+  th,td {
+    border: 1px solid #999;
+    padding: 0.4rem 0.6rem;
+    font-size: 10px;
+    text-align: center;
+  }
+  th {
+    background: #f0f0f0;
+  }
+  input {
+    border: 0px solid transparent;
+  }
+  select {
+    border: 0px solid transparent;
+  }
+}
+
+.notes {
+  font-size: 8px;
+  width: 90%;
+  margin: auto;
+}
+
+.placeholder {
+  margin: 1rem 0;
+  padding: 0.8rem;
+  font-size: 0.9rem;
+  color: #666;
+  border: 1px dashed #aaa;
+}
+
+/* Estilos básicos para los bloques editables */
+[contenteditable='true'] {
+  outline: none;
+  border-radius: 3px;
+  padding: 2px 4px;
+}
+
+[contenteditable='true']:focus {
+  box-shadow: 0 0 0 1px #1976d2;
+  background-color: #f3f8ff;
+}
+
+
+

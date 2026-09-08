@@ -1,0 +1,30 @@
+<app-template #template [imageUrl]="'/assets/img/hydromet-report-tool.png'" [appName]="'HYDROMET REPORT TOOL'" [appUrl]="'/apps/hydromet-report-tool'" >
+  <div panelContainer class="panel-container">
+    <app-dropdown iconClass="fa-regular fa-file-chart-column" title="Boletines" [expanded]="true">
+      <mat-form-field class="select scaled" appearance="outline">
+        <mat-label>Seleccione el boletín:</mat-label>
+        <mat-select [(ngModel)]="selectedReport">
+          <mat-option
+            class="scaled-text"
+            *ngFor="let report of reports"
+            [value]="report">
+            {{ report }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+    </app-dropdown>
+  </div>
+  <div mapContainer class="dashboard-container">
+    @if(selectedReport == "Reporte de tormentas severas"){
+      <app-storm-report-editor></app-storm-report-editor>
+    }
+    @if(selectedReport == "Reporte de focos de calor"){
+      <app-hotspot-report-editor></app-hotspot-report-editor>
+    }
+    @if(selectedReport == "Reporte hidrológico Especial Esmeraldas"){
+      <div>En construccion</div>
+    }
+  </div>
+</app-template>
+
+

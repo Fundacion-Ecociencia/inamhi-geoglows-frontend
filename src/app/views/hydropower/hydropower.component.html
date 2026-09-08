@@ -1,0 +1,184 @@
+<app-template #template [imageUrl]="'/assets/img/hydropower-data-explorer.png'" [appName]="'HYDROPOWER'" [appUrl]="'/apps/hydropower'" >
+  <div panelContainer class="panel-container">
+    <app-dropdown iconClass="fa-regular fa-bridge-water" title="Centrales Hidroeléctricas" [expanded]="true">
+      <mat-form-field class="select scaled" appearance="outline">
+        <mat-label>Central Hidroeléctrica:</mat-label>
+        <mat-select [(ngModel)]="selectedHydropower">
+          <mat-option
+            class="scaled-text"
+            *ngFor="let hydropower of hydropowers"
+            [value]="hydropower">
+            {{ hydropower }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <button mat-stroked-button class="dark-mode update-button scaled" (click)="updateHydropower()">
+        <i class="fa-solid fa-check" style="margin-right: 4px;"></i>Seleccionar
+      </button>
+
+      <button mat-stroked-button class="dark-mode update-button scaled" (click)="getHydrographCSV()">
+        <i class="fa-light fa-download" style="margin-right: 4px;"></i>Descargar
+      </button>
+
+    </app-dropdown>
+    <app-dropdown iconClass="fa-regular fa-earth-americas" title="Monitoreo GOES">
+      <mat-form-field class="select scaled" appearance="outline">
+        <mat-label>Producto:</mat-label>
+        <mat-select [(ngModel)]="selectedGoesProduct" (selectionChange)="updateGOESBand()">
+          <mat-option
+            class="scaled-text"
+            *ngFor="let variable of goesProducts" [value]="variable">
+              {{ variable }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field class="select scaled" appearance="outline">
+        <mat-label>Banda:</mat-label>
+        <mat-select [(ngModel)]="selectedGoesBand">
+          <mat-option
+            class="scaled-text"
+            *ngFor="let variable of goesBands" [value]="variable">
+              {{ variable }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+      <button mat-stroked-button class="dark-mode update-button scaled" (click)="updateGOESLayer()">
+        <i class="fa-solid fa-arrows-rotate"></i>
+        Actualizar producto
+      </button>
+      <div class="reprod-panel-button d-flex justify-content-between scaled">
+        <button mat-stroked-button class="dark-mode reprod-button" (click)="previousTimeControl()">
+          <i class="fa-solid fa-backward"></i>
+        </button>
+        <button mat-stroked-button class="dark-mode reprod-button" (click)="playTimeControl()">
+          @if(isPlay){
+            <i class="fa-solid fa-pause"></i>
+          }@else {
+            <i class="fa-solid fa-play"></i>
+          }
+        </button>
+        <button mat-stroked-button class="dark-mode reprod-button" (click)="stopTimeControl()">
+          <i class="fa-solid fa-stop"></i>
+        </button>
+        <button mat-stroked-button class="dark-mode reprod-button" (click)="nextTimeControl()">
+          <i class="fa-solid fa-forward"></i>
+        </button>
+      </div>
+      <div class="form-check form-switch pt-2">
+        <input class="form-check-input" type="checkbox" id="auto-update-goes" [(ngModel)]="isAutoUpdateGoes" (ngModelChange)="autoUpdateGoes()">
+        <label class="form-check-label" for="auto-update-goes">Actualización automática</label>
+      </div>
+    </app-dropdown>
+    <app-dropdown iconClass="fa-regular fa-cloud-sun-rain" title="Hidroestimadores">
+      <mat-form-field class="select scaled" appearance="outline">
+        <mat-label>Producto:</mat-label>
+        <mat-select [(ngModel)]="selectedSatellitePrecipitationProduct">
+          <mat-option
+            class="scaled-text"
+            *ngFor="let i of satellitePrecipitationProducts"
+            [value]="i">
+            {{ i }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field class="select scaled" appearance="outline">
+        <mat-label>Fecha:</mat-label>
+        <input matInput
+          [matDatepicker]="picker4"
+          [formControl]="dateControlSatellitePrecipitation"
+          [min]="minDateSatellitePrecipitation"
+          [max]="maxDateSatellitePrecipitation">
+        <mat-datepicker-toggle matIconSuffix [for]="picker4"></mat-datepicker-toggle>
+        <mat-datepicker #picker4></mat-datepicker>
+      </mat-form-field>
+      <button mat-stroked-button class="dark-mode update-button scaled" (click)="updatePacum()">
+        <i class="fa-regular fa-arrows-rotate"></i> Actualizar
+      </button>
+    </app-dropdown>
+
+    <app-dropdown iconClass="fa-regular fa-sun-plant-wilt" title="Índices de sequía"  [expanded]="false">
+      <mat-form-field class="select scaled" appearance="outline">
+        <mat-label>Indice de sequía:</mat-label>
+        <mat-select [(ngModel)]="selectedDroughtIndex">
+          <mat-option
+            class="scaled-text"
+            *ngFor="let i of droughtIndices"
+            [value]="i">
+            {{ i }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field class="select scaled" appearance="outline">
+        <mat-label>Fecha:</mat-label>
+        <input matInput
+          [matDatepicker]="picker1"
+          [formControl]="dateControlDrought"
+          [min]="minDateDrought"
+          [max]="maxDateDrought">
+        <mat-datepicker-toggle matIconSuffix [for]="picker1"></mat-datepicker-toggle>
+        <mat-datepicker #picker1></mat-datepicker>
+      </mat-form-field>
+
+
+
+      <button mat-stroked-button class="dark-mode update-button scaled" (click)="getDroughtIndex()">
+        <i class="fa-solid fa-arrows-rotate" style="margin-right: 4px;"></i> Actualizar
+      </button>
+      <br>
+      <div style="font-size: 10px; color: white;"><b>Nota:</b> Estimado usuario, los indices se calculan finalizado el mes. Por lo que el mes actual, aun no cuenta con datos.</div>
+      <br>
+    </app-dropdown>
+
+
+
+
+  </div>
+  <div mapContainer class="dashboard-container">
+    <div class="row row-panel">
+      <div class="col dashboard-element">
+        <div class="dashboard-title">Condiciones en tiempo real</div>
+        <div id="map-01" style="width: calc(100% - 20px); height: 90%; margin: 10px;"></div>
+      </div>
+      <div class="col dashboard-element">
+        <div class="dashboard-title">Precipitación acumulada en 24hrs</div>
+        <div id="map-02" style="width: calc(100% - 20px); height: 90%; margin: 10px;"></div>
+      </div>
+      <div class="col dashboard-element">
+        <div class="dashboard-title">Indice de sequía hidrológica</div>
+        <div id="map-03" style="width: calc(100% - 20px); height: 90%; margin: 10px;"></div>
+      </div>
+    </div>
+    <div class="row row-panel">
+      <div class="col dashboard-element" #panelDaily>
+        <div class="dashboard-title">Hietograma e hidrograma diario</div>
+        @if(isReadyDataPlot){
+          <div>
+            <plotly-plot id="dailyPlot"
+              [data]="dailyAveragePlot.data" [layout]="dailyAveragePlot.layout"
+              [useResizeHandler]="true" [style]="{position: 'relative', height: '100px', width:'100%'}">
+            </plotly-plot>
+          </div>
+        }
+        @else{
+          <app-loading></app-loading>
+        }
+      </div>
+
+      <div class="col dashboard-element" #panelForecast>
+        <div class="dashboard-title">Pronóstico hidrológico - GEOGLOWS</div>
+        @if(isReadyDataPlot){
+          <div>
+            <plotly-plot id="forecastPlot"
+              [data]="forecastPlot.data" [layout]="forecastPlot.layout"
+              [useResizeHandler]="true" [style]="{position: 'relative', height: '100px', width:'200px'}">
+            </plotly-plot>
+          </div>
+        }
+        @else{
+          <app-loading></app-loading>
+        }
+      </div>
+    </div>
+  </div>
+</app-template>

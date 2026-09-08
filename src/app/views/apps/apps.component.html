@@ -1,0 +1,84 @@
+<div>
+  <div class="header">
+    <nav class="navbar navbar-expand-md navbar-dark bg-dark"
+          [ngClass]="{'custom-navbar': !scrolled, 'custom-navbar-scrolled': scrolled}">
+      <div class="container d-flex justify-content-between">
+        <a class="navbar-brand" href="https://servicios.inamhi.gob.ec/">
+          <img
+            src="assets/img/inamhi-white-logo.png"
+            width="125"
+            class="d-inline-block align-top">
+        </a>
+        <button class="navbar-toggler"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#navbarToggle"
+                aria-controls="navbarToggle"
+                aria-expanded="false"
+                aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div
+          class="collapse navbar-collapse justify-content-end"
+          id="navbarToggle"
+          data-bs-theme="dark">
+            <div class="bg-dark" style="background-color: transparent !important;">
+              <ul class="navbar-nav">
+                <li class="nav-item active">
+                  <a class="nav-link text-center" href="/">INICIO</a>
+                </li>
+                <li class="nav-item text-center">
+                  <a class="nav-link" href="/apps">APLICACIONES</a>
+                </li>
+                <li class="nav-item text-center">
+                  <a class="nav-link" href="#">ACERCA DE</a>
+                </li>
+              </ul>
+            </div>
+        </div>
+      </div>
+    </nav>
+  </div>
+
+
+  <div class="position-absolute top-0 start-0 home-body">
+    <div class="position-relative home-container">
+      <div class="home-background">
+        <div class="container d-flex align-items-center h-100">
+          <div class="w-100 px-2">
+            <div class="col-12 d-flex justify-content-center">
+              <div class="home-content">
+                <br><br>
+                <div class="row">
+                  <div class="col home-title text-center"> APLICACIONES INAMHI GEOGLOWS</div>
+                </div>
+                <div class="d-flex flex-wrap justify-content-center custom-container">
+                  <app-cardapp
+                    [imageUrl]="'/assets/img/met-data-explorer.png'"
+                    [appName]="'Met Data Explorer Ecuador'"
+                    [appUrl]="'/apps/met-data-explorer'"/>
+                  <app-cardapp
+                    [imageUrl]="'/assets/img/hydroviewer.png'"
+                    [appName]="'Hydroviewer Ecuador'"
+                    [appUrl]="'/apps/hydroviewer'"/>
+                  <app-cardapp
+                    [imageUrl]="'/assets/img/hydropower-data-explorer.png'"
+                    [appName]="'Hydropower Ecuador'"
+                    [hRef]="'/apps/hydropower'"/>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="position-absolute bottom-0 d-flex align-items-end fade-in-3">
+          <div class="d-flex justify-content-center pb-4">
+            <img src="assets/img/all-white-logos-h.png" class="servir-logo-h">
+            <img src="assets/img/all-white-logos-v.png" class="servir-logo-v">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+</div>

@@ -1,0 +1,149 @@
+<div class="editor-container">
+  <div class="toolbar">
+    <button type="button">
+      Actualizar datos
+    </button>
+    <button type="button" (click)="exportPdf()">
+      Exportar a PDF
+    </button>
+  </div>
+  <div #reportContent class="page" [class.page-export]="isExporting">
+    <div class="image-header" *ngIf="!isExporting">
+      <img src="assets/img/report-header.png">
+    </div>
+    <h1 contenteditable="true" class="title1">
+      PREDICCIÓN DE FOCOS DE CALOR
+    </h1>
+    <div class="header-date" contenteditable="true">
+      <b>PRONÓSTICO No</b> {{dayText}}, <b>Año:</b> {{yearText}}<br>
+      <b>FECHA DE EMISIÓN:</b> {{ emissionText }}<br>
+      <b>FECHA DE VALIDEZ:</b> {{ validityText }}
+    </div>
+    <p contenteditable="true" class="intro">
+      La <b>DIRECCIÓN DE PRONÓSTICOS Y ALERTAS HIDROMETEOROLÓGICAS DEL INAMHI</b>,
+      con base en la información obtenida del modelo numérico del pronóstico del
+      tiempo WRF y la plataforma INAMHI GEOGLOWS emite el siguiente pronóstico:
+    </p>
+    <table class="storm-table">
+      <thead>
+        <tr>
+          <th>HUMEDAD RELATIVA <sup>1</sup></th>
+          <th>TEMPERATURA DEL AIRE <sup>1</sup></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="height: 350px;">
+            <img *ngIf="humidityImageUrl" [src]="humidityImageUrl" height="300px">
+            <div class="metric-text" contenteditable="true">
+              <b>Región Litoral:</b> Entre {{humidity_c_min}} y {{humidity_c_max}} % <br>
+              <b>Región Interandina:</b> Entre {{humidity_s_min}} y {{humidity_s_max}} % <br>
+              <b>Región Amazónica:</b> Entre {{humidity_a_min}} y {{humidity_a_max}} %
+            </div>
+          </td>
+          <td style="height: 350px;">
+            <img *ngIf="temperatureImageUrl" [src]="temperatureImageUrl" height="300px">
+            <div class="metric-text" contenteditable="true">
+              <b>Región Litoral:</b> Entre {{temperature_c_min}} y {{temperature_c_max}} °C <br>
+              <b>Región Interandina:</b> Entre {{temperature_s_min}} y {{temperature_s_max}} °C <br>
+              <b>Región Amazónica:</b> Entre {{temperature_a_min}} y {{temperature_a_max}} °C
+            </div>
+          </td>
+        </tr>
+      </tbody>
+      <thead>
+        <tr>
+          <th>VELOCIDAD Y DIRECCIÓN DEL VIENTO <sup>1</sup></th>
+          <th>INDICE DE HAINES <sup>1</sup></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="height: 350px;">
+            <img *ngIf="windImageUrl" [src]="windImageUrl" height="300px">
+            <div class="metric-text" contenteditable="true">
+              <b>Región Litoral:</b> Establecer dirección<br>
+              <b>Región Interandina:</b> Establecer dirección<br>
+              <b>Región Amazónica:</b> Establecer dirección
+            </div>
+          </td>
+          <td style="height: 350px;">
+            <img *ngIf="hainesImageUrl" [src]="hainesImageUrl" height="300px">
+            <div class="metric-text" contenteditable="true">
+              <b>Región Litoral:</b> Entre {{haines_c_min}} y {{haines_c_max}} <br>
+              <b>Región Interandina:</b> Entre {{haines_s_min}} y {{haines_s_max}} <br>
+              <b>Región Amazónica:</b> Entre {{haines_a_min}} y {{haines_a_max}}
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <br>
+    <table class="storm-table">
+      <thead>
+        <tr>
+          <th>HUMEDAD DEL SUELO REGISTRADA <sup>2</sup></th>
+          <th>DIAS CONSECUTIVOS SIN LLUVIAS SIGNIFICATIVA <sup>3</sup></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="height: 350px;">
+            <img *ngIf="soilMoistureImageUrl" [src]="soilMoistureImageUrl" height="300px">
+            <div class="metric-text" contenteditable="true">
+              <b>Región Litoral:</b> Entre {{soil_moisture_c_min}} y {{soil_moisture_c_max}} % <br>
+              <b>Región Interandina:</b> Entre {{soil_moisture_s_min}} y {{soil_moisture_s_max}} % <br>
+              <b>Región Amazónica:</b> Entre {{soil_moisture_a_min}} y {{soil_moisture_a_max}} %
+            </div>
+          </td>
+          <td style="height: 350px;">
+            <img *ngIf="noPrecImageUrl" [src]="noPrecImageUrl" height="300px">
+            <div class="metric-text" contenteditable="true">
+              <b>Región Litoral:</b> Entre {{noprec_c_min}} y {{noprec_c_max}} días<br>
+              <b>Región Interandina:</b> Entre {{noprec_s_min}} y {{noprec_s_max}} días<br>
+              <b>Región Amazónica:</b> Entre {{noprec_a_min}} y {{noprec_a_max}} días
+            </div>
+          </td>
+        </tr>
+      </tbody>
+      <thead>
+        <tr>
+          <th>PRECIPITACIÓN SATELITAL ÚLTIMAS 24 HORAS <sup>4,5</sup></th>
+          <th>PRECIPITACIÓN SATELITAL ÚLTIMAS 72 HORAS <sup>4,5</sup></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="height: 350px;">
+            <img *ngIf="pacum24ImageUrl" [src]="pacum24ImageUrl" height="300px">
+            <div class="metric-text" contenteditable="true">
+              <b>Región Litoral:</b> Entre {{pacum24_c_min}} y {{pacum24_c_max}} mm<br>
+              <b>Región Interandina:</b> Entre {{pacum24_s_min}} y {{pacum24_s_max}} mm<br>
+              <b>Región Amazónica:</b> Entre {{pacum24_a_min}} y {{pacum24_a_max}} mm
+            </div>
+          </td>
+          <td style="height: 350px;">
+            <img *ngIf="pacum72ImageUrl" [src]="pacum72ImageUrl" height="300px">
+            <div class="metric-text" contenteditable="true">
+              <b>Región Litoral:</b> Entre {{pacum72_c_min}} y {{pacum72_c_max}} mm<br>
+              <b>Región Interandina:</b> Entre {{pacum72_s_min}} y {{pacum72_s_max}} mm<br>
+              <b>Región Amazónica:</b> Entre {{pacum72_a_min}} y {{pacum72_a_max}} mm
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <br>
+    <div class="notes">
+      <ol>
+        <li>Pronóstico del tiempo atmosférico. Modelo WMRF</li>
+        <li>El contenido de humedad del suelo indica el volumen de agua presente en los poros del suelo y suele medirse en m<sup>3</sup>/m<sup>3</sup> (volumen de agua por volumen total). La escala indica la fracción de humedad del suelo para una subcuenca determinada, donde 100% significa totalmente saturado. https://earth.gsfc.nasa.gov/hydro/data/nasa-usda-global-soil-moisture-data</li>
+        <li>Un día sin lluvia significativa se refiere la precipitación acumulada fue menor a 2 mm en 24 horas</li>
+        <li>Producto IMERG. Integrated Multi-satellitE Retrievals for GPM. https://gpm.nasa.gov/data/imerg</li>
+        <li>1 mm equivale a 1 litro de agua por metro cuadrado</li>
+      </ol>
+    </div>
+
+  </div>
+
+</div>

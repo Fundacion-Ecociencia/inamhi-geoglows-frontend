@@ -1,0 +1,462 @@
+<app-template #template [imageUrl]="'/assets/img/met-data-explorer.png'" [appName]="'MET DATA EXPLORER'" [appUrl]="'/apps/met-data-explorer'" >
+  <div panelContainer class="panel-container">
+    <!--------------------------------------------------------------------------------------->
+    <!--                          SATELLITE BASED PRODUCT - PANEL                          -->
+    <!--------------------------------------------------------------------------------------->
+    <app-dropdown iconClass="fa-regular fa-satellite" title="Datos satelitales">
+      <mat-form-field class="select scaled" appearance="outline" style="padding-top: 12px;">
+        <mat-label>Variable:</mat-label>
+        <mat-select [(ngModel)]="selectedSatelliteVariable" (selectionChange)="updateSatelliteProduct()">
+          <mat-option class="scaled-text" *ngFor="let variable of satelliteVariable" [value]="variable">
+            {{ variable }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field class="select scaled" appearance="outline">
+        <mat-label>Producto:</mat-label>
+        <mat-select [(ngModel)]="selectedSatelliteProduct" (selectionChange)="updateSatelliteTemporal()">
+          <mat-option class="scaled-text" *ngFor="let product of satelliteProducts" [value]="product">
+            {{ product }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field class="select scaled" appearance="outline">
+        <mat-label>Temporalidad:</mat-label>
+        <mat-select [(ngModel)]="selectedSatelliteTemporal">
+          <mat-option class="scaled-text" *ngFor="let temporal of satelliteTemporal" [value]="temporal">
+            {{ temporal }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field class="select scaled" appearance="outline">
+        <mat-label>Rango de fechas:</mat-label>
+        <mat-date-range-input
+          [formGroup]="satelliteDateRange"
+          [rangePicker]="picker"
+          [min]="satelliteMinDate"
+          [max]="satelliteMaxDate">
+          <input matStartDate formControlName="start" placeholder="Start date">
+          <input matEndDate formControlName="end" placeholder="End date">
+        </mat-date-range-input>
+        <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+        <mat-date-range-picker #picker></mat-date-range-picker>
+      </mat-form-field>
+      <button mat-stroked-button class="dark-mode update-button scaled" (click)="updateSatelliteLayer()">
+        <i class="fa-solid fa-arrows-rotate"></i>
+        Actualizar datos
+      </button>
+      <br>
+    </app-dropdown>
+
+
+    <!--------------------------------------------------------------------------------------->
+    <!--                             GOES MONITORING - PANEL                               -->
+    <!--------------------------------------------------------------------------------------->
+    <app-dropdown iconClass="fa-regular fa-cloud-bolt-sun" title="Pronóstico meteorológico">
+      <mat-form-field class="select scaled" appearance="outline" style="padding-top: 12px;">
+        <mat-label>Modelo:</mat-label>
+        <mat-select [(ngModel)]="selectedForecastModel" (selectionChange)="updateSelectedForecastModel()">
+          <mat-option class="scaled-text" *ngFor="let model of forecastModels" [value]="model">
+            {{ model }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field class="select scaled" appearance="outline">
+        <mat-label>Variable:</mat-label>
+        <mat-select [(ngModel)]="selectedForecastVariable" (selectionChange)="updateSelectedForecastVariable()">
+          <mat-option class="scaled-text" *ngFor="let variable of forecastVariables" [value]="variable">
+            {{ variable }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field class="select scaled" appearance="outline">
+        <mat-label>Temporalidad:</mat-label>
+        <mat-select [(ngModel)]="selectedForecastTemporal">
+          <mat-option class="scaled-text" *ngFor="let temporal of forecastTemporal" [value]="temporal">
+            {{ temporal }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field class="select scaled" appearance="outline">
+        <mat-label>Inicialización del modelo:</mat-label>
+        <input matInput
+          [matDatepicker]="picker7"
+          [formControl]="dateControlForecast"
+          [min]="minDateForecast"
+          [max]="maxDateForecast">
+        <mat-datepicker-toggle matIconSuffix [for]="picker7"></mat-datepicker-toggle>
+        <mat-datepicker #picker7></mat-datepicker>
+      </mat-form-field>
+      <button mat-stroked-button class="dark-mode update-button scaled" (click)="updateForecastLayer()">
+        <i class="fa-regular fa-arrows-rotate" style="margin-right: 4px;"></i> Actualizar
+      </button>
+      <button mat-stroked-button class="dark-mode update-button scaled">
+        <i class="fa-regular fa-layer-minus" style="margin-right: 4px;"></i> Remover capa
+      </button>
+    </app-dropdown>
+
+    <!--------------------------------------------------------------------------------------->
+    <!--                             GOES MONITORING - PANEL                               -->
+    <!--------------------------------------------------------------------------------------->
+    <app-dropdown iconClass="fa-regular fa-earth-americas" title="Monitoreo GOES">
+      <mat-form-field class="select scaled" appearance="outline">
+        <mat-label>Producto:</mat-label>
+        <mat-select [(ngModel)]="selectedGoesProduct" (selectionChange)="updateGoesBand()">
+          <mat-option
+            class="scaled-text"
+            *ngFor="let variable of goesProducts" [value]="variable">
+              {{ variable }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field class="select scaled" appearance="outline">
+        <mat-label>Banda:</mat-label>
+        <mat-select [(ngModel)]="selectedGoesBand">
+          <mat-option
+            class="scaled-text"
+            *ngFor="let variable of goesBands" [value]="variable">
+              {{ variable }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field class="select scaled" appearance="outline">
+        <mat-label>Capa sobrepuesta:</mat-label>
+        <mat-select [(ngModel)]="selectedGoesOverlay">
+          <mat-option
+            class="scaled-text"
+            *ngFor="let variable of goesOverlay" [value]="variable">
+              {{ variable }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+      <button mat-stroked-button class="dark-mode update-button scaled" (click)="updateGoesLayer()">
+        <i class="fa-solid fa-arrows-rotate"></i>
+        Actualizar producto
+      </button>
+      <div class="form-check form-switch pt-2">
+        <input class="form-check-input" type="checkbox" id="auto-update-goes" [(ngModel)]="isAutoUpdateGoes" (ngModelChange)="autoUpdateGoes()">
+        <label class="form-check-label" for="auto-update-goes">Actualización automática</label>
+      </div>
+    </app-dropdown>
+
+
+    <app-dropdown iconClass="fa-regular fa-chart-tree-map" title="Alertas meteorológicas">
+      <mat-form-field class="select scaled" appearance="outline">
+        <mat-label>Advertencia por:</mat-label>
+        <mat-select [(ngModel)]="selectedMeteoWarningType" (ngModelChange)="onUpdateWarningType()">
+          <mat-option
+            class="scaled-text"
+            *ngFor="let i of meteoWarningTypes"
+            [value]="i">
+            {{ i }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field class="select scaled" appearance="outline">
+        <mat-label>Advertencia Número:</mat-label>
+        <mat-select [(ngModel)]="selectedMeteoWarning">
+          <mat-option
+            class="scaled-text"
+            *ngFor="let i of meteoWarnings"
+            [value]="i">
+            {{ i }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+      <button mat-stroked-button class="dark-mode update-button scaled" (click)="updateMeteoWarningLayer()">
+        <i class="fa-regular fa-arrows-rotate" style="margin-right: 4px;"></i> Actualizar
+      </button>
+      <button mat-stroked-button class="dark-mode update-button scaled" (click)="dropOverlays()">
+        <i class="fa-regular fa-layer-minus" style="margin-right: 4px;"></i> Remover capa
+      </button>
+      <br>
+      <div style="font-size: 10px; color: white;"><b>Nota:</b>
+        Estimado usuario, las advertencias son actualizadas a medida que la Dirección de Pronósticos y Alertas Hidrometeorológicas (DPAH) las emite.
+      </div>
+      <br>
+    </app-dropdown>
+
+
+    <app-dropdown iconClass="fa-regular fa-house-flood-water" title="FFGS">
+      <mat-form-field class="select scaled" appearance="outline">
+        <mat-label>Producto:</mat-label>
+        <mat-select [(ngModel)]="selectedFFGSProduct">
+          <mat-option
+            class="scaled-text"
+            *ngFor="let i of FFGSProducts"
+            [value]="i">
+            {{ i }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field class="select scaled" appearance="outline">
+        <mat-label>Fecha:</mat-label>
+        <input matInput
+          [matDatepicker]="picker5"
+          [formControl]="dateControlFFGS"
+          [min]="minDateFFGS"
+          [max]="maxDateFFGS">
+        <mat-datepicker-toggle matIconSuffix [for]="picker5"></mat-datepicker-toggle>
+        <mat-datepicker #picker5></mat-datepicker>
+      </mat-form-field>
+      <mat-form-field class="select scaled" appearance="outline">
+        <mat-label>Hora de inicialización:</mat-label>
+        <mat-select [(ngModel)]="selectedFFGSRun">
+          <mat-option
+            class="scaled-text"
+            *ngFor="let i of FFGSRun"
+            [value]="i">
+            {{ i }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+      <button mat-stroked-button class="dark-mode update-button scaled" (click)="updateFFGS()">
+        <i class="fa-regular fa-arrows-rotate"></i> Actualizar
+      </button>
+      <button mat-stroked-button class="dark-mode update-button scaled" (click)="dropOverlays()">
+        <i class="fa-regular fa-layer-minus" style="margin-right: 4px;"></i> Remover capa
+      </button>
+      <br>
+      <div style="font-size: 10px; color: white;"><b>Nota:</b> Estimado usuario, los datos corresponden a Flash Flood Guidance System con actualización cada 6 horas.</div>
+      <br>
+    </app-dropdown>
+
+    <app-dropdown iconClass="fa-regular fa-fire" title="Incendios forestales">
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="pacum24"
+          [(ngModel)]="isActivePacum24Layer" (ngModelChange)="updatePacum24()">
+        <label class="form-check-label" for="pacum24">Precipitación diaria</label>
+      </div>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="drougth-days"
+          [(ngModel)]="isActiveNoRainLayer"  (ngModelChange)="updateNoRain()">
+        <label class="form-check-label" for="drougth-days">Días consecutivos sin lluvia</label>
+      </div>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="soilmoisture"
+          [(ngModel)]="isActiveSoilMoistureLayer"  (ngModelChange)="updateSoilMoisture()">
+        <label class="form-check-label" for="soilmoisture">Humedad del suelo</label>
+      </div>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="fire-goes"
+          [(ngModel)]="isActiveFireGOESLayer" (ngModelChange)="autoUpdateFireGOES()">
+        <label class="form-check-label" for="fire-goes">Focos de calor GOES</label>
+      </div>
+    </app-dropdown>
+
+    <app-dropdown iconClass="fa-regular fa-sensor-triangle-exclamation" title="Eventos adversos SNGR">
+      <mat-form-field class="select scaled" appearance="outline">
+        <mat-label>Evento:</mat-label>
+        <mat-select [(ngModel)]="selectedSngrEvent">
+          <mat-option
+            class="scaled-text"
+            *ngFor="let i of sngrEvents"
+            [value]="i">
+            {{ i }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field class="select scaled" appearance="outline">
+        <mat-label>Filtrar evento por:</mat-label>
+        <mat-select [(ngModel)]="selectedSngrFilter">
+          <mat-option
+            class="scaled-text"
+            *ngFor="let i of sngrFilters"
+            [value]="i">
+            {{ i }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field class="select scaled" appearance="outline">
+        <mat-label>Rango de fechas:</mat-label>
+        <mat-date-range-input
+          [formGroup]="sngrEventDateRange"
+          [rangePicker]="pickerSNGR"
+          [min]="sngrEventMinDate"
+          [max]="sngrEventMaxDate">
+          <input matStartDate formControlName="start" placeholder="Start date">
+          <input matEndDate formControlName="end" placeholder="End date">
+        </mat-date-range-input>
+        <mat-datepicker-toggle matIconSuffix [for]="pickerSNGR"></mat-datepicker-toggle>
+        <mat-date-range-picker #pickerSNGR></mat-date-range-picker>
+      </mat-form-field>
+      <button mat-stroked-button class="dark-mode update-button scaled" (click)="autoUpdateSNGRevents()">
+        <i class="fa-regular fa-arrows-rotate"></i> Actualizar
+      </button>
+      <button mat-stroked-button class="dark-mode update-button scaled" (click)="removeSNGRevents()">
+        <i class="fa-regular fa-layer-minus" style="margin-right: 4px;"></i> Remover capa
+      </button>
+
+    </app-dropdown>
+
+
+    <app-dropdown iconClass="fa-regular fa-layer-group" title="Capas e información">
+      <div class="panel-subtitle">Cartografía base</div>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="check-cities" (ngModelChange)="updateOverlayers(isActiveCountriesLayer, countriesLayer)"
+            [(ngModel)]="isActiveCountriesLayer">
+        <label class="form-check-label" for="check-cities">Límites nacionales</label>
+      </div>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="check-cities" (ngModelChange)="updateOverlayers(isActiveProvinceLayer, provinceLayer)"
+            [(ngModel)]="isActiveProvinceLayer">
+        <label class="form-check-label" for="check-cities">Límites provinciales</label>
+      </div>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="check-cities" (ngModelChange)="updateOverlayers(isActiveCitiesLayer, citiesLayer)"
+            [(ngModel)]="isActiveCitiesLayer">
+        <label class="form-check-label" for="check-cities">Ciudades principales</label>
+      </div>
+      <div class="panel-subtitle" style="margin-top: 15px;">Mapas de suceptibilidad - SNGR</div>
+       <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="check-cities" (ngModelChange)="updateOverlayers(isActiveFloodRiskSGRLayer, floodRiskSGRLayer)"
+            [(ngModel)]="isActiveFloodRiskSGRLayer">
+        <label class="form-check-label" for="check-cities">Inundaciones</label>
+      </div>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="check-cities" (ngModelChange)="updateOverlayers(isActiveDroughtRiskSGRLayer, droughtRiskSGRLayer)"
+            [(ngModel)]="isActiveDroughtRiskSGRLayer">
+        <label class="form-check-label" for="check-cities">Sequías</label>
+      </div>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="check-cities" (ngModelChange)="updateOverlayers(isActiveLandSlidesRiskSGRLayer, landSlidesRiskSGRLayer)"
+            [(ngModel)]="isActiveLandSlidesRiskSGRLayer">
+        <label class="form-check-label" for="check-cities">Movimientos en masa</label>
+      </div>
+
+      <div class="panel-subtitle" style="margin-top: 15px;">Áreas protegidas - MAATE</div>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="check-cities" (ngModelChange)="updateOverlayers(isActiveCorredorConectividadLayer, corredorConectividadLayer)"
+            [(ngModel)]="isActiveCorredorConectividadLayer">
+        <label class="form-check-label" for="check-cities">Corredor de conectividad</label>
+      </div>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="check-cities" (ngModelChange)="updateOverlayers(isActiveRecargaHidricaLayer, recargaHidricaLayer)"
+            [(ngModel)]="isActiveRecargaHidricaLayer">
+        <label class="form-check-label" for="check-cities">Zona de recarga hídrica</label>
+      </div>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="check-cities" (ngModelChange)="updateOverlayers(isActiveProteccionHidricaLayer, proteccionHidricaLayer)"
+            [(ngModel)]="isActiveProteccionHidricaLayer">
+        <label class="form-check-label" for="check-cities">Áreas de protección hídrica</label>
+      </div>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="check-cities" (ngModelChange)="updateOverlayers(isActiveHumedalRamsarLayer, humedalRamsarLayer)"
+            [(ngModel)]="isActiveHumedalRamsarLayer">
+        <label class="form-check-label" for="check-cities">Humedal Ramsar</label>
+      </div>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="check-cities" (ngModelChange)="updateOverlayers(isActiveReservaBiosferaLayer, reservaBiosferaLayer)"
+            [(ngModel)]="isActiveReservaBiosferaLayer">
+        <label class="form-check-label" for="check-cities">Reserva de biósfera</label>
+      </div>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="check-cities" (ngModelChange)="updateOverlayers(isActiveSocioBosqueLayer, socioBosqueLayer)"
+            [(ngModel)]="isActiveSocioBosqueLayer">
+        <label class="form-check-label" for="check-cities">Áreas de conservación PSB</label>
+      </div>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="check-cities" (ngModelChange)="updateOverlayers(isActiveBosqueProtectorLayer, bosqueProtectorLayer)"
+            [(ngModel)]="isActiveBosqueProtectorLayer">
+        <label class="form-check-label" for="check-cities">Bosque y vegetación protectora</label>
+      </div>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="check-cities" (ngModelChange)="updateOverlayers(isActiveAreasProtegidasLayer, areasProtegidasLayer)"
+            [(ngModel)]="isActiveAreasProtegidasLayer">
+        <label class="form-check-label" for="check-cities">Sistema Nacional de Áreas Protegidas</label>
+      </div>
+
+      <div class="panel-subtitle" style="margin-top: 15px;">Centrales hidroeléctricas</div>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="check-cities" (ngModelChange)="updateOverlayers(isActiveHydropowerLayer, hydropowerLayer)"
+            [(ngModel)]="isActiveHydropowerLayer">
+        <label class="form-check-label" for="check-cities">Hidroeléctricas mayores 50 MW</label>
+      </div>
+
+      <div class="panel-subtitle" style="margin-top: 15px;">Cuencas hidrográficas</div>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="check-cities" (ngModelChange)="updateOverlayers(isActivePauteLayer, pauteLayer)"
+            [(ngModel)]="isActivePauteLayer">
+        <label class="form-check-label" for="check-cities">Complejo hidroeléctrico Paute</label>
+      </div>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="check-cities" (ngModelChange)="updateOverlayers(isActiveCocaCodoLayer, cocaCodoLayer)"
+            [(ngModel)]="isActiveCocaCodoLayer">
+        <label class="form-check-label" for="check-cities">Coca Codo Sinclair</label>
+      </div>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="check-cities" (ngModelChange)="updateOverlayers(isActiveMinasSanFranciscoLayer, minasSanFranciscoLayer)"
+            [(ngModel)]="isActiveMinasSanFranciscoLayer">
+        <label class="form-check-label" for="check-cities">Minas San Francisco</label>
+      </div>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="check-cities" (ngModelChange)="updateOverlayers(isActiveAgoyanLayer, agoyanLayer)"
+            [(ngModel)]="isActiveAgoyanLayer">
+        <label class="form-check-label" for="check-cities">Agoyán - San Francisco</label>
+      </div>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="check-cities" (ngModelChange)="updateOverlayers(isActiveDelsintanisaguaLayer, delsintanisaguaLayer)"
+            [(ngModel)]="isActiveDelsintanisaguaLayer">
+        <label class="form-check-label" for="check-cities">Delsintanisagua</label>
+      </div>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="check-cities" (ngModelChange)="updateOverlayers(isActiveDueLayer, dueLayer)"
+            [(ngModel)]="isActiveDueLayer">
+        <label class="form-check-label" for="check-cities">Due</label>
+      </div>
+    </app-dropdown>
+
+
+    <app-dropdown iconClass="fa-regular fa-upload" title="Cargar capa">
+      <div class="panel-subtitle">Graficar área geográfica o puntos</div>
+      <app-file-uploader id="shpFile" (geojsonLoaded)="onGeoFileLoaded($event)"></app-file-uploader>
+      <div style="color:white; font-size:0.7rem; width: 95%; padding-top: 5px; padding-bottom: 5px;">
+        Se aceptan archivos shapefile (comprimidos en zip), geopackage, y kml. El archivo debe estar proyectado en EPSG:4326 (Coordenadas geográficas)
+      </div>
+    </app-dropdown>
+
+  </div>
+
+
+  <div mapContainer>
+    <div id="map"></div>
+    <div class="reprod-container d-flex align-items-center justify-content-between px-3">
+      <div class="reprod-title">
+        <i class="fa-regular fa-sliders"></i>&nbsp;
+        Panel de control y animación
+      </div>
+      <div>
+        <div class="reprod-panel-button d-flex justify-content-between">
+          <button mat-stroked-button class="dark-mode reprod-button" (click)="previousTimeControl()">
+            <i class="fa-solid fa-backward"></i>
+          </button>
+          <button mat-stroked-button class="dark-mode reprod-button" (click)="playTimeControl()">
+            @if(isPlay){
+              <i class="fa-solid fa-pause"></i>
+            }@else {
+              <i class="fa-solid fa-play"></i>
+            }
+          </button>
+          <button mat-stroked-button class="dark-mode reprod-button" (click)="stopTimeControl()">
+            <i class="fa-solid fa-stop"></i>
+          </button>
+          <button mat-stroked-button class="dark-mode reprod-button" (click)="nextTimeControl()">
+            <i class="fa-solid fa-forward"></i>
+          </button>
+        </div>
+      </div>
+      <div class="reprod-panel-save d-flex justify-content-between">
+        <button mat-stroked-button class="dark-mode reprod-button" (click)="downloadRaster()">
+          <i class="fa-regular fa-download"></i>
+        </button>
+        <button mat-stroked-button class="dark-mode reprod-button" (click)="captureMap()">
+          <i class="fa-regular fa-camera-viewfinder"></i>
+        </button>
+        <button mat-stroked-button class="dark-mode reprod-button" (click)="captureVideo()">
+          <i class="fa-regular fa-video"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+</app-template>
