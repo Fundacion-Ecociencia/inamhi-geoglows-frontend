@@ -277,12 +277,14 @@ export class MetDataExplorerComponent {
   public initializeMap() {
     // Base maps
     const osm = L.tileLayer(
-      'https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-         zIndex: -1
+      `https://basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}.png?key=${env.cartoKey}`, {
+         zIndex: -1,
+         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
       });
     const carto = L.tileLayer(
-      'https://abcd.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
-        zIndex: -1
+      `https://basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png?key=${env.cartoKey}`, {
+        zIndex: -1,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
       });
     const baseMaps = {
       "Mapa claro": osm,
@@ -347,7 +349,7 @@ export class MetDataExplorerComponent {
     this.provinceLayer.addTo(this.map);
 
     this.citiesLayer = L.tileLayer(
-      'https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}.png', {
+      `https://basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}.png?key=${env.cartoKey}`, {
        zIndex: 1001
     });
     this.citiesLayer.addTo(this.map);
@@ -949,7 +951,7 @@ export class MetDataExplorerComponent {
 
     let title = `
       <b>
-        <i class="fa-regular fa-chart-tree-map"></i>
+        <i class="fa-solid fa-triangle-exclamation"></i>
         Advertencia No ${this.selectedMeteoWarning}.
       </b><br>
       <b>${this.selectedMeteoWarningType}</b><br>
@@ -1205,7 +1207,7 @@ export class MetDataExplorerComponent {
 
     if(this.selectedFFGSProduct === "Humedad del suelo"){
       title = `
-        <b><i class="fa-regular fa-house-flood-water"></i></b>
+        <b><i class="fa-solid fa-house-flood-water"></i></b>
         <b>Flash Flood Guidance System</b><br>${this.selectedFFGSProduct}<br>
         Válido para ${queryDate2}
         <img
@@ -1215,7 +1217,7 @@ export class MetDataExplorerComponent {
     }
     if(this.selectedFFGSProduct === "Riesgo de crecida (prox. 24h)"){
       title = `
-        <b><i class="fa-regular fa-house-flood-water"></i></b>
+        <b><i class="fa-solid fa-house-flood-water"></i></b>
         <b>Flash Flood Guidance System</b><br>${this.selectedFFGSProduct}<br>
         Válido para ${queryDate2}
         <img
@@ -1225,7 +1227,7 @@ export class MetDataExplorerComponent {
     }
     if(this.selectedFFGSProduct === "Pronóstico de precipitación (prox. 24h)"){
       title = `
-        <b><i class="fa-regular fa-house-flood-water"></i></b>
+        <b><i class="fa-solid fa-house-flood-water"></i></b>
         <b>Flash Flood Guidance System</b><br>${this.selectedFFGSProduct}<br>
         Válido para ${queryDate2}
         <img
@@ -1235,7 +1237,7 @@ export class MetDataExplorerComponent {
     }
     if(this.selectedFFGSProduct === "Precipitación crítica"){
       title = `
-        <b><i class="fa-regular fa-house-flood-water"></i></b>
+        <b><i class="fa-solid fa-house-flood-water"></i></b>
         <b>Flash Flood Guidance System</b><br>${this.selectedFFGSProduct}<br>
         Válido para ${queryDate2}
         <img

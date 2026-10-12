@@ -35,7 +35,7 @@ export class LegendControlGeoglowsFloodWarning {
     this._container.style.width = '280px';
     this._container.innerHTML = `
       <b>
-        <i class="fa-regular fa-cloud-showers-water"></i>
+        <i class="fa-solid fa-cloud-showers-water"></i>
         Alertas por inundación (GEOGLOWS)
       </b><br>
       <b>Inicialización del modelo:</b> ${this.dateString}<br>
@@ -85,7 +85,7 @@ export class LegendControlDrought {
     this._container.style.margin = '8px';
     this._container.style.width = '280px';
     this._container.innerHTML = `
-      <b><i class="fa-regular fa-sun-plant-wilt"></i> ${this.title}</b><br>
+      <b><i class="fa-solid fa-sun-plant-wilt"></i> ${this.title}</b><br>
       <b>Fecha:</b> ${this.dateString}<br>
 
       <div style="display: flex; align-items: center; margin-bottom: 2px;">
@@ -190,7 +190,7 @@ export class LegendControlMeteoWarning {
     this._container.style.margin = '8px';
     this._container.style.width = '280px';
     this._container.innerHTML = `
-      <b><i class="fa-regular fa-chart-tree-map"></i> Advertencia No ${this.number}.</b><br>
+      <b><i class="fa-solid fa-triangle-exclamation"></i> Advertencia No ${this.number}.</b><br>
       <b>${this.title}</b><br>
       Válido desde ${this.start}<br>hasta ${this.end}
 
@@ -269,7 +269,7 @@ export class LegendControlPacum {
     this._container.style.margin = '8px';
     this._container.style.width = '280px';
     this._container.innerHTML = `
-      <b><i class="fa-regular fa-cloud-sun-rain"></i></b>
+      <b><i class="fa-solid fa-cloud-sun-rain"></i></b>
       <b>Precipitacion acumulada</b><br>Desde ${this.date1} 07:00 <br>hasta ${this.date2} 07:00 <br>
       <img
         src="https://inamhi.geoglows.org/assets/legend/P_Diaria.png"
@@ -322,7 +322,7 @@ export class LegendControlFFGS {
 
     if(this.title === "Humedad del suelo"){
       this._container.innerHTML = `
-        <b><i class="fa-regular fa-house-flood-water"></i></b>
+        <b><i class="fa-solid fa-house-flood-water"></i></b>
         <b>Flash Flood Guidance System</b><br>${this.title}<br>
         Válido para ${this.date}
         <img
@@ -333,7 +333,7 @@ export class LegendControlFFGS {
     }
     if(this.title === "Riesgo de crecida (prox. 24h)"){
       this._container.innerHTML = `
-        <b><i class="fa-regular fa-house-flood-water"></i></b>
+        <b><i class="fa-solid fa-house-flood-water"></i></b>
         <b>Flash Flood Guidance System</b><br>${this.title}<br>
         Válido para ${this.date}
         <img
@@ -344,7 +344,7 @@ export class LegendControlFFGS {
     }
     if(this.title === "Pronóstico de precipitación (prox. 24h)"){
       this._container.innerHTML = `
-        <b><i class="fa-regular fa-house-flood-water"></i></b>
+        <b><i class="fa-solid fa-house-flood-water"></i></b>
         <b>Flash Flood Guidance System</b><br>${this.title}<br>
         Válido para ${this.date}
         <img
@@ -355,7 +355,7 @@ export class LegendControlFFGS {
     }
     if(this.title === "Precipitación crítica"){
       this._container.innerHTML = `
-        <b><i class="fa-regular fa-house-flood-water"></i></b>
+        <b><i class="fa-solid fa-house-flood-water"></i></b>
         <b>Flash Flood Guidance System</b><br>${this.title}<br>
         Válido para ${this.date}
         <img
