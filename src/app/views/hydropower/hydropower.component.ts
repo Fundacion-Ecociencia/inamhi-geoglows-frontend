@@ -225,10 +225,11 @@ export class HydropowerComponent {
     });
 
     // Base map
-    const baseLayer = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+    const baseLayer = `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=${env.cartoKey}`;
+    const attribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
 
     [this.map1, this.map2, this.map3].forEach(m => {
-      L.tileLayer(baseLayer, { zIndex: -1 }).addTo(m);
+      L.tileLayer(baseLayer, { zIndex: -1, attribution }).addTo(m);
     });
 
     // Synchronize movements and zoom

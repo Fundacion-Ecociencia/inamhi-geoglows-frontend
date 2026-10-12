@@ -277,12 +277,14 @@ export class MetDataExplorerComponent {
   public initializeMap() {
     // Base maps
     const osm = L.tileLayer(
-      'https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-         zIndex: -1
+      `https://basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}.png?key=${env.cartoKey}`, {
+         zIndex: -1,
+         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
       });
     const carto = L.tileLayer(
       `https://basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png?key=${env.cartoKey}`, {
-        zIndex: -1
+        zIndex: -1,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
       });
     const baseMaps = {
       "Mapa claro": osm,
