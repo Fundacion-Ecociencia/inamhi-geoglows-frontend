@@ -951,7 +951,7 @@ export class MetDataExplorerComponent {
 
     let title = `
       <b>
-        <i class="fa-regular fa-chart-tree-map"></i>
+        <i class="fa-solid fa-triangle-exclamation"></i>
         Advertencia No ${this.selectedMeteoWarning}.
       </b><br>
       <b>${this.selectedMeteoWarningType}</b><br>
@@ -1207,7 +1207,7 @@ export class MetDataExplorerComponent {
 
     if(this.selectedFFGSProduct === "Humedad del suelo"){
       title = `
-        <b><i class="fa-regular fa-house-flood-water"></i></b>
+        <b><i class="fa-solid fa-house-flood-water"></i></b>
         <b>Flash Flood Guidance System</b><br>${this.selectedFFGSProduct}<br>
         Válido para ${queryDate2}
         <img
@@ -1217,7 +1217,7 @@ export class MetDataExplorerComponent {
     }
     if(this.selectedFFGSProduct === "Riesgo de crecida (prox. 24h)"){
       title = `
-        <b><i class="fa-regular fa-house-flood-water"></i></b>
+        <b><i class="fa-solid fa-house-flood-water"></i></b>
         <b>Flash Flood Guidance System</b><br>${this.selectedFFGSProduct}<br>
         Válido para ${queryDate2}
         <img
@@ -1227,7 +1227,7 @@ export class MetDataExplorerComponent {
     }
     if(this.selectedFFGSProduct === "Pronóstico de precipitación (prox. 24h)"){
       title = `
-        <b><i class="fa-regular fa-house-flood-water"></i></b>
+        <b><i class="fa-solid fa-house-flood-water"></i></b>
         <b>Flash Flood Guidance System</b><br>${this.selectedFFGSProduct}<br>
         Válido para ${queryDate2}
         <img
@@ -1237,7 +1237,7 @@ export class MetDataExplorerComponent {
     }
     if(this.selectedFFGSProduct === "Precipitación crítica"){
       title = `
-        <b><i class="fa-regular fa-house-flood-water"></i></b>
+        <b><i class="fa-solid fa-house-flood-water"></i></b>
         <b>Flash Flood Guidance System</b><br>${this.selectedFFGSProduct}<br>
         Válido para ${queryDate2}
         <img

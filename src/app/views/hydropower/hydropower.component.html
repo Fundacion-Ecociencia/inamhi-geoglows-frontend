@@ -1,6 +1,6 @@
 <app-template #template [imageUrl]="'/assets/img/hydropower-data-explorer.png'" [appName]="'HYDROPOWER'" [appUrl]="'/apps/hydropower'" >
   <div panelContainer class="panel-container">
-    <app-dropdown iconClass="fa-regular fa-bridge-water" title="Centrales Hidroeléctricas" [expanded]="true">
+    <app-dropdown iconClass="fa-solid fa-bridge-water" title="Centrales Hidroeléctricas" [expanded]="true">
       <mat-form-field class="select scaled" appearance="outline">
         <mat-label>Central Hidroeléctrica:</mat-label>
         <mat-select [(ngModel)]="selectedHydropower">
@@ -18,11 +18,11 @@
       </button>
 
       <button mat-stroked-button class="dark-mode update-button scaled" (click)="getHydrographCSV()">
-        <i class="fa-light fa-download" style="margin-right: 4px;"></i>Descargar
+        <i class="fa-solid fa-download" style="margin-right: 4px;"></i>Descargar
       </button>
 
     </app-dropdown>
-    <app-dropdown iconClass="fa-regular fa-earth-americas" title="Monitoreo GOES">
+    <app-dropdown iconClass="fa-solid fa-earth-americas" title="Monitoreo GOES">
       <mat-form-field class="select scaled" appearance="outline">
         <mat-label>Producto:</mat-label>
         <mat-select [(ngModel)]="selectedGoesProduct" (selectionChange)="updateGOESBand()">
@@ -70,7 +70,7 @@
         <label class="form-check-label" for="auto-update-goes">Actualización automática</label>
       </div>
     </app-dropdown>
-    <app-dropdown iconClass="fa-regular fa-cloud-sun-rain" title="Hidroestimadores">
+    <app-dropdown iconClass="fa-solid fa-cloud-sun-rain" title="Hidroestimadores">
       <mat-form-field class="select scaled" appearance="outline">
         <mat-label>Producto:</mat-label>
         <mat-select [(ngModel)]="selectedSatellitePrecipitationProduct">
@@ -93,11 +93,11 @@
         <mat-datepicker #picker4></mat-datepicker>
       </mat-form-field>
       <button mat-stroked-button class="dark-mode update-button scaled" (click)="updatePacum()">
-        <i class="fa-regular fa-arrows-rotate"></i> Actualizar
+        <i class="fa-solid fa-arrows-rotate"></i> Actualizar
       </button>
     </app-dropdown>
 
-    <app-dropdown iconClass="fa-regular fa-sun-plant-wilt" title="Índices de sequía"  [expanded]="false">
+    <app-dropdown iconClass="fa-solid fa-sun-plant-wilt" title="Índices de sequía"  [expanded]="false">
       <mat-form-field class="select scaled" appearance="outline">
         <mat-label>Indice de sequía:</mat-label>
         <mat-select [(ngModel)]="selectedDroughtIndex">

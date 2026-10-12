@@ -1,6 +1,6 @@
 <app-template #template [imageUrl]="'/assets/img/hydroviewer.png'" [appName]="'HYDROVIEWER'" [appUrl]="'/apps/hydroviewer'">
   <div panelContainer class="panel-container">
-    <app-dropdown iconClass="fa-regular fa-cloud-showers-water" title="Alertas por inundación" [expanded]="false">
+    <app-dropdown iconClass="fa-solid fa-cloud-showers-water" title="Alertas por inundación" [expanded]="false">
       <div class="form-check form-switch">
         <input class="form-check-input" type="checkbox" id="check-002yr"
             [(ngModel)]="isActiveFlood002" (ngModelChange)="updateFloodWarnings()">
@@ -57,13 +57,13 @@
         <i class="fa-solid fa-arrows-rotate" style="margin-right: 4px;"></i> Actualizar
       </button>
       <button mat-stroked-button class="dark-mode update-button scaled" (click)="dropMainLayer()">
-        <i class="fa-regular fa-layer-minus" style="margin-right: 4px;"></i> Remover capa
+        <i class="fa-solid fa-eraser" style="margin-right: 4px;"></i> Remover capa
       </button>
       <br><br>
     </app-dropdown>
 
 
-    <app-dropdown iconClass="fa-regular fa-sun-plant-wilt" title="Índices de sequía"  [expanded]="false">
+    <app-dropdown iconClass="fa-solid fa-sun-plant-wilt" title="Índices de sequía"  [expanded]="false">
       <mat-form-field class="select scaled" appearance="outline">
         <mat-label>Indice de sequía:</mat-label>
         <mat-select [(ngModel)]="selectedDroughtIndex">
@@ -92,14 +92,14 @@
         <i class="fa-solid fa-arrows-rotate" style="margin-right: 4px;"></i> Actualizar
       </button>
       <button mat-stroked-button class="dark-mode update-button scaled" (click)="dropMainLayer()">
-        <i class="fa-regular fa-layer-minus" style="margin-right: 4px;"></i> Remover capa
+        <i class="fa-solid fa-eraser" style="margin-right: 4px;"></i> Remover capa
       </button>
       <br>
       <div style="font-size: 10px; color: white;"><b>Nota:</b> Estimado usuario, los indices se calculan finalizado el mes. Por lo que el mes actual, aun no cuenta con datos.</div>
       <br>
     </app-dropdown>
 
-    <app-dropdown iconClass="fa-regular fa-chart-tree-map" title="Alertas meteorológicas">
+    <app-dropdown iconClass="fa-solid fa-triangle-exclamation" title="Alertas meteorológicas">
       <mat-form-field class="select scaled" appearance="outline">
         <mat-label>Advertencia por:</mat-label>
         <mat-select [(ngModel)]="selectedMeteoWarningType" (ngModelChange)="onUpdateWarningType()">
@@ -123,17 +123,17 @@
         </mat-select>
       </mat-form-field>
       <button mat-stroked-button class="dark-mode update-button scaled" (click)="updateMeteoWarningLayer()">
-        <i class="fa-regular fa-arrows-rotate" style="margin-right: 4px;"></i> Actualizar
+        <i class="fa-solid fa-arrows-rotate" style="margin-right: 4px;"></i> Actualizar
       </button>
       <button mat-stroked-button class="dark-mode update-button scaled" (click)="dropOverlays()">
-        <i class="fa-regular fa-layer-minus" style="margin-right: 4px;"></i> Remover capa
+        <i class="fa-solid fa-eraser" style="margin-right: 4px;"></i> Remover capa
       </button>
       <br>
       <div style="font-size: 10px; color: white;"><b>Nota:</b> Estimado usuario, las advertencias son actualizadas a medida que la Dirección de Pronósticos y Alertas Hidrometeorológicas (DPAH) las emite.</div>
       <br>
     </app-dropdown>
 
-    <app-dropdown iconClass="fa-regular fa-cloud-sun-rain" title="Hidroestimadores">
+    <app-dropdown iconClass="fa-solid fa-cloud-sun-rain" title="Hidroestimadores">
       <mat-form-field class="select scaled" appearance="outline">
         <mat-label>Producto:</mat-label>
         <mat-select [(ngModel)]="selectedSatellitePrecipitationProduct">
@@ -167,10 +167,10 @@
         <mat-datepicker #picker4></mat-datepicker>
       </mat-form-field>
       <button mat-stroked-button class="dark-mode update-button scaled" (click)="updatePacum()">
-        <i class="fa-regular fa-arrows-rotate"></i> Actualizar
+        <i class="fa-solid fa-arrows-rotate"></i> Actualizar
       </button>
       <button mat-stroked-button class="dark-mode update-button scaled" (click)="dropOverlays()">
-        <i class="fa-regular fa-layer-minus" style="margin-right: 4px;"></i> Remover capa
+        <i class="fa-solid fa-eraser" style="margin-right: 4px;"></i> Remover capa
       </button>
       <br>
       <div style="font-size: 10px; color: white;"><b>Nota:</b> Estimado usuario, los datos de precipitación satelital se actualizan aproximadamente a las 8.00 am, cada día.</div>
@@ -178,7 +178,7 @@
     </app-dropdown>
 
 
-    <app-dropdown iconClass="fa-regular fa-house-flood-water" title="FFGS">
+    <app-dropdown iconClass="fa-solid fa-house-flood-water" title="FFGS">
       <mat-form-field class="select scaled" appearance="outline">
         <mat-label>Producto:</mat-label>
         <mat-select [(ngModel)]="selectedFFGSProduct">
@@ -212,10 +212,10 @@
         </mat-select>
       </mat-form-field>
       <button mat-stroked-button class="dark-mode update-button scaled" (click)="updateFFGS()">
-        <i class="fa-regular fa-arrows-rotate"></i> Actualizar
+        <i class="fa-solid fa-arrows-rotate"></i> Actualizar
       </button>
       <button mat-stroked-button class="dark-mode update-button scaled" (click)="dropOverlays()">
-        <i class="fa-regular fa-layer-minus" style="margin-right: 4px;"></i> Remover capa
+        <i class="fa-solid fa-eraser" style="margin-right: 4px;"></i> Remover capa
       </button>
       <br>
       <div style="font-size: 10px; color: white;"><b>Nota:</b> Estimado usuario, los datos corresponden a Flash Flood Guidance System con actualización cada 6 horas.</div>
@@ -223,7 +223,7 @@
     </app-dropdown>
 
 
-    <app-dropdown iconClass="fa-regular fa-layer-group" title="Capas e información">
+    <app-dropdown iconClass="fa-solid fa-layer-group" title="Capas e información">
       <div class="panel-subtitle">Cartografía base</div>
       <div class="form-check form-switch">
         <input class="form-check-input" type="checkbox" id="check-drainage" (ngModelChange)="updateOverlayers(isActiveDrainageLayer, 'drainage')"
@@ -346,7 +346,7 @@
       </div>
     </app-dropdown>
 
-    <app-dropdown iconClass="fa-regular fa-upload" title="Cargar capa">
+    <app-dropdown iconClass="fa-solid fa-upload" title="Cargar capa">
       <div class="panel-subtitle">Graficar área geográfica o puntos</div>
       <app-file-uploader id="shpFile" (geojsonLoaded)="onGeoFileLoaded($event)"></app-file-uploader>
       <div style="color:white; font-size:0.7rem; width: 95%; padding-top: 5px; padding-bottom: 5px;">
@@ -362,7 +362,7 @@
 
     <div class="reprod-container d-flex align-items-center justify-content-between px-3">
       <div class="reprod-title">
-        <i class="fa-regular fa-sliders"></i>&nbsp;
+        <i class="fa-solid fa-sliders"></i>&nbsp;
         Panel de control y animación
       </div>
       <div>
@@ -387,13 +387,13 @@
       </div>
       <div class="reprod-panel-save d-flex justify-content-between">
         <button mat-stroked-button class="dark-mode reprod-button">
-          <i class="fa-regular fa-download"></i>
+          <i class="fa-solid fa-download"></i>
         </button>
         <button mat-stroked-button class="dark-mode reprod-button">
-          <i class="fa-regular fa-camera-viewfinder"></i>
+          <i class="fa-solid fa-camera"></i>
         </button>
         <button mat-stroked-button class="dark-mode reprod-button">
-          <i class="fa-regular fa-video"></i>
+          <i class="fa-solid fa-video"></i>
         </button>
       </div>
     </div>
@@ -471,7 +471,7 @@
               [useResizeHandler]="true" [style]="{position: 'relative', height: '400px', width:'100%'}">
             </plotly-plot>
             <button type="button" class="btn btn-primary btn-sm" (click)="donwloadHistorical()">
-              <i class="fa-regular fa-download"></i>
+              <i class="fa-solid fa-download"></i>
               &nbsp; Descargar Simulación Histórica
             </button>
         }@else {
@@ -542,7 +542,7 @@
         <div #table></div>
         <br>
         <button type="button" class="btn btn-primary btn-sm" (click)="donwloadForecast()">
-          <i class="fa-regular fa-download"></i>
+          <i class="fa-solid fa-download"></i>
           &nbsp; Descargar Pronóstico
         </button>
       </div>
