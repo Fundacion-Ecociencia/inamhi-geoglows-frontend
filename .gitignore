@@ -40,3 +40,6 @@ testem.log
 # System files
 .DS_Store
 Thumbs.db
+
+# Llave de CARTO Basemaps: no va a git (plantilla en carto-key.example.ts)
+/src/environments/carto-key.ts

@@ -78,7 +78,7 @@ export class MapControl{
   public addCities(map:Map){
     map.addSource("osm_cities", {
       type: 'raster',
-      tiles: ['https://abcd.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}.png'],
+      tiles: [`https://basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}.png?key=${env.cartoKey}`],
       tileSize: 256
     });
     map.addLayer({

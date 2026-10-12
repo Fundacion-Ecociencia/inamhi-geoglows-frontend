@@ -281,7 +281,7 @@ export class MetDataExplorerComponent {
          zIndex: -1
       });
     const carto = L.tileLayer(
-      'https://abcd.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
+      `https://basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png?key=${env.cartoKey}`, {
         zIndex: -1
       });
     const baseMaps = {
@@ -347,7 +347,7 @@ export class MetDataExplorerComponent {
     this.provinceLayer.addTo(this.map);
 
     this.citiesLayer = L.tileLayer(
-      'https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}.png', {
+      `https://basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}.png?key=${env.cartoKey}`, {
        zIndex: 1001
     });
     this.citiesLayer.addTo(this.map);
