@@ -566,7 +566,8 @@ export class MetDataExplorerComponent {
             version: '1.1.0',
             styles: '',
             srs: 'EPSG:3857',
-            time: `${date}`
+            time: `${date}`,
+            tileSize: 512
           } as L.WMSOptions & { time: string })
         return wmsLayer
       })
@@ -662,7 +663,8 @@ export class MetDataExplorerComponent {
             styles: '',
             srs: 'EPSG:3857',
             time: `${date}`,
-            dim_initd: `${dates[0]}`
+            dim_initd: `${dates[0]}`,
+            tileSize: 512   // 4 teselas por fecha a escala país en vez de 12 (GOES ya usa 512)
           } as L.WMSOptions & { time: string, dim_initd: string})
         return wmsLayer
       });
@@ -1303,7 +1305,8 @@ export class MetDataExplorerComponent {
             version: '1.1.0',
             styles: '',
             srs: 'EPSG:3857',
-            time: `${date}`
+            time: `${date}`,
+            tileSize: 512
           } as L.WMSOptions & { time: string })
         return wmsLayer
       })[0]
@@ -1319,7 +1322,8 @@ export class MetDataExplorerComponent {
             version: '1.1.0',
             styles: '',
             srs: 'EPSG:3857',
-            time: `${date}`
+            time: `${date}`,
+            tileSize: 512
           } as L.WMSOptions & { time: string })
         return wmsLayer
       })[0];

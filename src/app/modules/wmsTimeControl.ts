@@ -40,6 +40,13 @@ export class WMSTimeControl {
   private closeBtn!: HTMLButtonElement;
   private expandBtn!: HTMLButtonElement;
   private minimized = false;
+  // Precarga progresiva: la fecha visible se pide primero y las demás de una en una (ver constructor)
+  private pendingPreload: number[] = [];
+  private preloadCancelled = false;
+  private preloadInFlight = 0;
+  // Cuántas fechas se precargan a la vez después de la visible. 1 = una por una (la visible tarda menos, la
+  // animación completa tarda más); medido el 14 oct 2026 con WRF 3-horario (25 fechas): 1 → 0,9 s / 21 s, 3 → ver daily.
+  private static readonly PRELOAD_CONCURRENCY = 3;
 
 
   /**
@@ -131,29 +138,62 @@ export class WMSTimeControl {
     this.expandBtn.addEventListener('click', () => this.expandLegend());
 
 
-    // Load all layers and leave only the first one visible
+    // Primero la fecha visible; las demás se precargan de una en una cuando la anterior termina.
+    // Antes se añadían todas a la vez (hasta 25 fechas x 12 teselas = 300 peticiones en el mismo instante)
+    // y la fecha visible competía con las otras: el mapa se dibujaba "por cuadrados" durante varios segundos.
     if (this.layers.length > 0) {
       const startIndex = this.reverse ? this.layers.length - 1 : 0;
       const endIndex = this.reverse ? -1 : this.layers.length;
       const step = this.reverse ? -1 : 1;
 
-      // Load layers and overlays at the same time
+      this.pendingPreload = [];
       for (let i = startIndex; i !== endIndex; i += step) {
-        this.layers[i].setOpacity(0).addTo(this.map);
-        if (this.overlays && this.overlays.length > 0) {
-          this.overlays[i].setOpacity(0).addTo(this.map);
-        }
+        if (i !== this.currentDateIndex) { this.pendingPreload.push(i); }
       }
 
-      // Set the opacity of visible layers
-      this.layers[this.currentDateIndex].setOpacity(1);
-      if (this.overlays && this.overlays.length > 0) {
-        this.overlays[this.currentDateIndex].setOpacity(1);
-      }
+      this.addStep(this.currentDateIndex, 1);
+      this.whenLoaded(this.currentDateIndex, () => this.preloadNext());
 
       this.updateLegend();
     }
 
+  }
+
+  /** Añade al mapa la capa (y su overlay) de un paso de tiempo con la opacidad indicada. */
+  private addStep(i: number, opacity: number) {
+    this.layers[i].setOpacity(opacity).addTo(this.map);
+    if (this.overlays && this.overlays.length > 0) {
+      this.overlays[i].setOpacity(opacity).addTo(this.map);
+    }
+  }
+
+  /** Llama a cb cuando la capa de un paso terminó de cargar sus teselas (o enseguida si no es una capa de teselas). */
+  private whenLoaded(i: number, cb: () => void) {
+    const layer = this.layers[i];
+    if (layer && typeof layer.once === 'function') {
+      layer.once('load', cb);
+    } else {
+      cb();
+    }
+  }
+
+  /** Si un paso aún no se precargó (el usuario avanzó antes de tiempo), lo añade ahora mismo. */
+  private ensureAdded(i: number) {
+    const layer = this.layers[i];
+    if (!layer || this.map.hasLayer(layer)) return;
+    this.pendingPreload = this.pendingPreload.filter(k => k !== i);
+    this.addStep(i, 0);
+  }
+
+  /** Precarga el siguiente paso pendiente, invisible, y encadena el siguiente al terminar. */
+  private preloadNext() {
+    while (!this.preloadCancelled && this.preloadInFlight < WMSTimeControl.PRELOAD_CONCURRENCY) {
+      const i = this.pendingPreload.shift();
+      if (i === undefined) return;
+      this.preloadInFlight++;
+      this.addStep(i, 0);
+      this.whenLoaded(i, () => { this.preloadInFlight--; this.preloadNext(); });
+    }
   }
 
   /**
@@ -162,7 +202,7 @@ export class WMSTimeControl {
   public setStart(){
     this.currentDateIndex = 0;
     this.layers.map((layer) => { layer.setOpacity(0)});
-    this.layers[this.currentDateIndex]?.setOpacity(1);
+    this.ensureAdded(this.currentDateIndex); this.layers[this.currentDateIndex]?.setOpacity(1);
     if (this.overlays && this.overlays.length > 0) {
       this.overlays.map((layer) => { layer.setOpacity(0)});
       this.overlays[this.currentDateIndex]?.setOpacity(1);
@@ -175,7 +215,7 @@ export class WMSTimeControl {
    */
   private updateNextLayer(){
     this.layers[this.currentDateIndex - 1]?.setOpacity(0);
-    this.layers[this.currentDateIndex]?.setOpacity(1);
+    this.ensureAdded(this.currentDateIndex); this.layers[this.currentDateIndex]?.setOpacity(1);
     if (this.overlays && this.overlays.length > 0) {
       this.overlays[this.currentDateIndex - 1]?.setOpacity(0);
       this.overlays[this.currentDateIndex]?.setOpacity(1);
@@ -200,7 +240,7 @@ export class WMSTimeControl {
    */
   private updatePreviousLayer(){
     this.layers[this.currentDateIndex + 1]?.setOpacity(0);
-    this.layers[this.currentDateIndex]?.setOpacity(1);
+    this.ensureAdded(this.currentDateIndex); this.layers[this.currentDateIndex]?.setOpacity(1);
     if (this.overlays && this.overlays.length > 0) {
       this.overlays[this.currentDateIndex + 1]?.setOpacity(0);
       this.overlays[this.currentDateIndex]?.setOpacity(1);
@@ -246,6 +286,8 @@ export class WMSTimeControl {
    */
   public destroy(){
     this.pause();
+    this.preloadCancelled = true;
+    this.pendingPreload = [];
     this.layers.forEach(layer => {layer.remove()});
     if (this.overlays && this.overlays.length > 0){
       this.overlays.forEach(layer => {layer.remove()});
