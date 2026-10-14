@@ -167,14 +167,21 @@ export class WMSTimeControl {
     }
   }
 
-  /** Llama a cb cuando la capa de un paso terminó de cargar sus teselas (o enseguida si no es una capa de teselas). */
+  /**
+   * Llama a cb (una sola vez) cuando la capa del paso y su overlay, si lo hay, terminaron de cargar sus teselas.
+   * Si alguna no avisa (capa sin teselas en la vista, error de red), un tope de tiempo evita que la precarga se quede
+   * parada para siempre.
+   */
   private whenLoaded(i: number, cb: () => void) {
-    const layer = this.layers[i];
-    if (layer && typeof layer.once === 'function') {
-      layer.once('load', cb);
-    } else {
-      cb();
-    }
+    const capas: L.Layer[] = [];
+    if (this.layers[i] && typeof this.layers[i].once === 'function') { capas.push(this.layers[i]); }
+    if (this.overlays && this.overlays.length > 0 && this.overlays[i] && typeof this.overlays[i].once === 'function') { capas.push(this.overlays[i]); }
+    let pendientes = capas.length;
+    let hecho = false;
+    const terminar = () => { if (!hecho) { hecho = true; clearTimeout(tope); cb(); } };
+    const tope = setTimeout(terminar, 20000);
+    if (pendientes === 0) { terminar(); return; }
+    capas.forEach(l => l.once('load', () => { if (--pendientes === 0) terminar(); }));
   }
 
   /** Si un paso aún no se precargó (el usuario avanzó antes de tiempo), lo añade ahora mismo. */
