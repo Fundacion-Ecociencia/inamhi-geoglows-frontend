@@ -34,5 +34,7 @@ export class AppsComponent {
    *                             State variables                             *
    ***************************************************************************/
   public scrolled:boolean = false;
+  // ENSO Ecuador se usa por enlace directo (/apps/enso) hasta que se decida mostrarla.
+  public showEnsoCard = false;
 
 }

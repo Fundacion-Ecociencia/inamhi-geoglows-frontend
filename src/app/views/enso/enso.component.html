@@ -1,0 +1,314 @@
+<app-template #template
+  [imageUrl]="'/assets/img/climate-trends.png'"
+  [appName]="'ENSO ECUADOR'"
+  [appUrl]="'/apps/enso'"
+  [isPanelActive]="isPanelActive"
+  (panelActivate)="onPanelToggle($event)">
+
+  <!------------------------------------------------------------------------------->
+  <!--                               PANEL LATERAL                               -->
+  <!------------------------------------------------------------------------------->
+  <div panelContainer class="panel-container">
+    <app-dropdown iconClass="fa-solid fa-temperature-half" title="Estado del ENSO" [expanded]="true">
+      @if (statusCards) {
+        @for (card of statusCards; track card.title) {
+          <div class="status-card" [style.border-left-color]="card.color">
+            <div class="status-title">{{ card.title }}</div>
+            <div><span class="status-value">{{ card.value }}</span> {{ card.extra }}</div>
+            <div>{{ card.label }} · {{ card.date }}</div>
+          </div>
+        }
+      } @else if (statusFailed) {
+        <div class="status-card status-empty">Sin datos</div>
+      } @else {
+        <div class="status-card status-empty">Cargando…</div>
+      }
+      <div class="panel-note"><b>Nota:</b> ICEN oficial (IGP) con dos meses de atraso; el provisional se calcula igual sobre OISST.</div>
+    </app-dropdown>
+
+    <app-dropdown iconClass="fa-solid fa-water" title="Pacífico: anomalía de TSM">
+      <mat-form-field class="select scaled" appearance="outline">
+        <mat-label>Días:</mat-label>
+        <mat-select [(ngModel)]="sstDays">
+          @for (d of cfg.SST_DAYS; track d) {
+            <mat-option class="scaled-text" [value]="d">{{ d }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <button mat-stroked-button class="dark-mode update-button scaled" (click)="applySst()">
+        <i class="fa-solid fa-arrows-rotate" style="margin-right: 4px;"></i> Actualizar
+      </button>
+      <div class="panel-note"><b>Nota:</b> la animación toma una fecha de cada cuatro días; se controla en la barra de abajo del mapa.</div>
+    </app-dropdown>
+
+    <app-dropdown iconClass="fa-solid fa-arrow-trend-up" title="Ecuador: caudal esperado">
+      <mat-form-field class="select scaled" appearance="outline">
+        <mat-label>Fase del Niño costero:</mat-label>
+        <mat-select [(ngModel)]="phase">
+          @for (p of cfg.PHASES; track p.value) {
+            <mat-option class="scaled-text" [value]="p.value">{{ p.label }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field class="select scaled" appearance="outline">
+        <mat-label>Mes:</mat-label>
+        <mat-select [(ngModel)]="month">
+          @for (m of cfg.MONTHS; track m.value) {
+            <mat-option class="scaled-text" [value]="m.value">{{ m.label }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <button mat-stroked-button class="dark-mode update-button scaled" (click)="applyComposite()">
+        <i class="fa-solid fa-arrows-rotate" style="margin-right: 4px;"></i> Actualizar
+      </button>
+      <div class="panel-note"><b>Nota:</b> caudal medio del mes en los años con esa fase del ICEN, respecto a la media de todos los años (GEOGLOWS 1980–2026). Fases del ENFEN: cálida moderada o mayor, ICEN &gt; 1,3; cálida débil, 0,5 a 1,3; neutra, −0,7 a 0,5; fría, &lt; −0,7.</div>
+    </app-dropdown>
+
+    <app-dropdown iconClass="fa-solid fa-chart-column" title="Gráficas">
+      <mat-form-field class="select scaled" appearance="outline">
+        <mat-label>Paneles:</mat-label>
+        <mat-select [(ngModel)]="panelCountChoice">
+          @for (n of cfg.PANEL_COUNTS; track n) {
+            <mat-option class="scaled-text" [value]="n">{{ n }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <button mat-stroked-button class="dark-mode update-button scaled" (click)="showCharts()">
+        <i class="fa-solid fa-chart-column" style="margin-right: 4px;"></i> Mostrar gráficas
+      </button>
+      <div class="panel-note"><b>Nota:</b> el tipo y el índice de cada gráfica se eligen en su cabecera. Al abrir se comparan, año por mes, el ICEN de la costa y el ONI del Pacífico central.</div>
+    </app-dropdown>
+
+    <app-dropdown iconClass="fa-solid fa-layer-group" title="Capas e información">
+      <div class="panel-subtitle">Ecuador</div>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="enso-check-provinces"
+               [(ngModel)]="showProvinces" (ngModelChange)="toggleProvinces()">
+        <label class="form-check-label" for="enso-check-provinces">Límites provinciales</label>
+      </div>
+      <div class="panel-subtitle">Pacífico</div>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="enso-check-regions"
+               [(ngModel)]="showRegions" (ngModelChange)="toggleRegions()">
+        <label class="form-check-label" for="enso-check-regions">Regiones Niño</label>
+      </div>
+    </app-dropdown>
+  </div>
+
+
+  <!------------------------------------------------------------------------------->
+  <!--                             ÁREA PRINCIPAL                                -->
+  <!------------------------------------------------------------------------------->
+  <div mapContainer class="enso-main">
+    <!-- Barra superior: qué se muestra. Mismo fondo y botones que la barra inferior. -->
+    <div class="mode-bar d-flex align-items-center px-3" role="group" aria-label="Vista principal">
+      @for (m of cfg.VIEW_MODES; track m.value) {
+        <button mat-stroked-button class="dark-mode mode-button" [class.mode-active]="mode === m.value"
+                [attr.aria-pressed]="mode === m.value" [attr.aria-label]="m.label" (click)="setMode(m.value)">
+          <i [class]="m.icon"></i>&nbsp; <span class="label-long">{{ m.label }}</span><span class="label-short">{{ m.short }}</span>
+        </button>
+      }
+    </div>
+
+    <!-- Los dos mapas siguen en la página al ocultarse: así la animación no se pierde. -->
+    <div class="map-view" [class.is-hidden]="mode !== 'pacific'">
+      <div id="map-pacific" class="map"></div>
+      @if (sstMessage) { <div class="map-message" role="status">{{ sstMessage }}</div> }
+    </div>
+    <div class="map-view" [class.is-hidden]="mode !== 'ecuador'">
+      <div id="map-ecuador" class="map"></div>
+      @if (compositeMissing) {
+        <div class="map-message" role="status">La capa de caudal esperado aún no está publicada en Martin</div>
+      }
+    </div>
+
+    <!-- Barra inferior (fragmentos.md, sección 3). Los botones solo en el Pacífico, que es el que se anima. -->
+    @if (mode !== 'charts') {
+      <div class="reprod-container d-flex align-items-center justify-content-between px-3" [class.with-buttons]="mode === 'pacific'">
+        <div class="reprod-title"><i class="fa-solid fa-sliders"></i>&nbsp; <span class="reprod-title-text">Panel de control y animación</span></div>
+        @if (mode === 'pacific') {
+          <div class="reprod-panel-button d-flex justify-content-between">
+            <button mat-stroked-button class="dark-mode reprod-button" aria-label="Anterior" [disabled]="!timeControl" (click)="previousFrame()">
+              <i class="fa-solid fa-backward"></i>
+            </button>
+            <button mat-stroked-button class="dark-mode reprod-button" [attr.aria-label]="isPlay ? 'Pausar' : 'Reproducir'" [disabled]="!timeControl" (click)="playAnimation()">
+              @if (isPlay) { <i class="fa-solid fa-pause"></i> } @else { <i class="fa-solid fa-play"></i> }
+            </button>
+            <button mat-stroked-button class="dark-mode reprod-button" aria-label="Detener" [disabled]="!timeControl" (click)="stopAnimation()">
+              <i class="fa-solid fa-stop"></i>
+            </button>
+            <button mat-stroked-button class="dark-mode reprod-button" aria-label="Siguiente" [disabled]="!timeControl" (click)="nextFrame()">
+              <i class="fa-solid fa-forward"></i>
+            </button>
+          </div>
+        }
+        <div class="reprod-panel-save"></div>
+      </div>
+    }
+
+    <!-- Gráficas: de 1 a 4 paneles, cada uno con su tipo e índice en la cabecera. -->
+    @if (mode === 'charts') {
+      <div class="charts-grid" [style.--cols]="layout.columns" [style.--rows]="layout.rows">
+        @for (chart of charts; track chart; let i = $index) {
+          @if (i < panelCount) {
+            <section class="chart-panel" [class.chart-wide]="i === layout.wide" [attr.aria-label]="'Gráfica ' + (i + 1)">
+              <div class="chart-header dark-mode">
+                <div class="chart-field chart-field-type">
+                  <mat-form-field class="scaled" appearance="outline" subscriptSizing="dynamic">
+                    <mat-label>Tipo:</mat-label>
+                    <mat-select [(ngModel)]="chart.type" (selectionChange)="onChartChange(i)">
+                      @for (t of cfg.CHART_TYPES; track t.value) {
+                        <mat-option class="scaled-text" [value]="t.value">{{ t.label }}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                </div>
+                <div class="chart-field chart-field-index">
+                  <mat-form-field class="scaled" appearance="outline" subscriptSizing="dynamic">
+                    <mat-label>Índice:</mat-label>
+                    <mat-select [(ngModel)]="chart.index" [disabled]="chart.type === 'hovmoller'" (selectionChange)="onChartChange(i)">
+                      @for (x of cfg.INDICES; track x.value) {
+                        <mat-option class="scaled-text" [value]="x.value">{{ x.label }}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                </div>
+                @if (chart.type === 'series') {
+                  <div class="chart-field chart-field-years">
+                    <mat-form-field class="scaled" appearance="outline" subscriptSizing="dynamic">
+                      <mat-label>Años:</mat-label>
+                      <mat-select [(ngModel)]="chart.years" (selectionChange)="onChartChange(i)">
+                        @for (y of cfg.INDEX_YEARS; track y) {
+                          <mat-option class="scaled-text" [value]="y">{{ y }}</mat-option>
+                        }
+                      </mat-select>
+                    </mat-form-field>
+                  </div>
+                }
+              </div>
+              <div #chartArea class="chart-area">
+                <ng-container *ngTemplateOutlet="plotCell; context: { $implicit: cells['chart' + i], height: '100%' }"></ng-container>
+              </div>
+            </section>
+          }
+        }
+      </div>
+    }
+  </div>
+
+  <!-- Contenido de una celda con gráfico: el gráfico, el cargador o "Sin datos por ahora". -->
+  <ng-template #plotCell let-cell let-height="height">
+    @switch (cell.state) {
+      @case ('ready') {
+        <plotly-plot [data]="cell.plot.data" [layout]="cell.plot.layout" [useResizeHandler]="true"
+          [style]="{position: 'relative', height: height, width: '100%'}"></plotly-plot>
+      }
+      @case ('empty') { <div class="no-data">Sin datos por ahora</div> }
+      @default { <app-loading></app-loading> }
+    }
+  </ng-template>
+
+
+  <!------------------------------------------------------------------------------->
+  <!--                              MODAL DE UN RÍO                              -->
+  <!------------------------------------------------------------------------------->
+  <div dataModalHeader>
+    <div class="container" #modalWidth>
+      <div class="modal-header-title">CAUDAL ESPERADO SEGÚN EL ENSO</div>
+      <div class="row modal-header-content">
+        <div class="col-sm-12 col-md-3 py-1"><b>RÍO:</b> {{ river.river }}</div>
+        <div class="col-sm-12 col-md-3 py-1"><b>PROVINCIA:</b> {{ river.province }}</div>
+        <div class="col-sm-12 col-md-3 py-1"><b>CANTÓN:</b> {{ river.canton }}</div>
+        <div class="col-sm-12 col-md-3 py-1"><b>COMID:</b> {{ river.comid }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div dataModalBody>
+    @if (!river.comid) {
+      <p class="analog-years">Haga clic en un río del mapa de Ecuador para ver su caudal esperado según el ENSO.</p>
+    }
+    <ul class="nav nav-tabs" role="tablist" [hidden]="!river.comid">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="enso-tab-composite" data-bs-toggle="tab" data-bs-target="#enso-pane-composite"
+                type="button" role="tab" aria-controls="enso-pane-composite" aria-selected="true">Caudal por fase</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="enso-tab-analogs" data-bs-toggle="tab" data-bs-target="#enso-pane-analogs"
+                type="button" role="tab" aria-controls="enso-pane-analogs" aria-selected="false">Años análogos</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="enso-tab-icen" data-bs-toggle="tab" data-bs-target="#enso-pane-icen"
+                type="button" role="tab" aria-controls="enso-pane-icen" aria-selected="false">Historia del ICEN</button>
+      </li>
+    </ul>
+    <div class="tab-content" [hidden]="!river.comid">
+      <div class="tab-pane fade show active" id="enso-pane-composite" role="tabpanel" aria-labelledby="enso-tab-composite">
+        <ng-container *ngTemplateOutlet="plotCell; context: { $implicit: cells['composite'], height: '400px' }"></ng-container>
+        <button type="button" class="btn btn-primary btn-sm" (click)="downloadCsv()">
+          <i class="fa-solid fa-download"></i>&nbsp; Descargar CSV
+        </button>
+        @if (csvError) { <span class="modal-error">No se pudo descargar el CSV.</span> }
+      </div>
+      <div class="tab-pane fade" id="enso-pane-analogs" role="tabpanel" aria-labelledby="enso-tab-analogs">
+        <ng-container *ngTemplateOutlet="plotCell; context: { $implicit: cells['analogs'], height: '400px' }"></ng-container>
+        @if (analogYears.length) {
+          <p class="analog-years"><b>Años análogos:</b> {{ analogYears.join(', ') }}</p>
+        }
+      </div>
+      <div class="tab-pane fade" id="enso-pane-icen" role="tabpanel" aria-labelledby="enso-tab-icen">
+        <ng-container *ngTemplateOutlet="plotCell; context: { $implicit: cells['icen'], height: '400px' }"></ng-container>
+      </div>
+    </div>
+  </div>
+
+
+  <!------------------------------------------------------------------------------->
+  <!--                            MODAL DE INFORMACIÓN                           -->
+  <!------------------------------------------------------------------------------->
+  <div infoModalBody class="info-modal">
+    <p>
+      El ENSO (El Niño–Oscilación del Sur) es el calentamiento o enfriamiento del Pacífico tropical que cambia
+      las lluvias y los caudales en buena parte del mundo. Al Ecuador le importa sobre todo lo que pasa frente a su
+      costa, en la región Niño 1+2: en 2017 hubo un Niño costero con inundaciones mientras el índice global (ONI)
+      marcaba neutro. Por eso esta app pone al centro el ICEN, el índice costero del ENFEN, y muestra cuánta agua
+      llevan los ríos ecuatorianos en cada fase.
+    </p>
+    <h3>Cómo se usa</h3>
+    <p>
+      La barra de arriba cambia lo que se ve: el Pacífico con la anomalía de temperatura del mar (animada, con las
+      regiones Niño), el Ecuador con el caudal esperado de cada río (clic en un río para ver su detalle) o las gráficas.
+      En las gráficas se eligen de uno a cuatro paneles en el panel lateral, y el tipo y el índice de cada uno en su
+      cabecera. Al abrir se ponen lado a lado el ICEN y el ONI año por mes: un mismo episodio puede verse grave en la
+      costa y moderado en el Pacífico central.
+    </p>
+    <h3>Fuentes de datos</h3>
+    <ul>
+      <li><b>Índices ONI, RONI, Niño 1+2, Niño 3.4, SOI:</b> NOAA Climate Prediction Center (CPC).</li>
+      <li><b>Temperatura del mar diaria:</b> NOAA NCEI, OISST v2.1 (anomalía respecto a 1971–2000, la climatología del archivo diario; los índices usan 1991–2020).</li>
+      <li><b>ICEN oficial:</b> IGP / ENFEN (Perú). El provisional se calcula con el mismo método sobre OISST.</li>
+      <li><b>MEI.v2:</b> NOAA Physical Sciences Laboratory (PSL).</li>
+      <li><b>Caudales:</b> simulación retrospectiva de GEOGLOWS v2 para los ríos del Ecuador.</li>
+    </ul>
+    <h3>Actualización</h3>
+    <p>
+      Índices y temperatura del mar: todos los días a las 09:30 de Ecuador (UTC−5). Caudal esperado por fase:
+      el día 6 de cada mes.
+    </p>
+    <h3>Fases del Niño costero</h3>
+    <p>
+      Se usan los umbrales del ENFEN (2024) sobre el ICEN: cálida moderada o mayor, más de 1,3 °C; cálida débil,
+      de 0,5 a 1,3 °C; neutra, de −0,7 a 0,5 °C; fría, menos de −0,7 °C.
+    </p>
+    <h3>Advertencia</h3>
+    <p>
+      El caudal esperado es el promedio de los años que tuvieron esa fase del ICEN. Algunas fases, como la cálida
+      moderada o mayor, ocurrieron pocas veces desde 1980 (el número de años, <i>n</i>, se muestra en el gráfico del río): con
+      tan pocos casos el promedio puede depender de un solo evento y debe leerse con cuidado.
+    </p>
+    <p>
+      <b>Nota:</b> en un entorno local (de desarrollo) el mapa base de CARTO sale gris porque su llave solo vale en
+      inamhi.geoglows.org. No es un error.
+    </p>
+  </div>
+</app-template>
