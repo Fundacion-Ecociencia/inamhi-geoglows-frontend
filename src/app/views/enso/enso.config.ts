@@ -167,7 +167,7 @@ export interface ChartSettings { type: ChartType; index: string; years: number; 
  * episodio se ve grave en la costa y moderado en el Pacífico central.
  */
 export const CHART_DEFAULTS: ChartSettings[] = [
-  { type: 'heatmap', index: 'icen_prov', years: 20 },
+  { type: 'heatmap', index: 'icen', years: 20 },   // oficial completado con el provisional: desde 1950, como el ONI
   { type: 'heatmap', index: 'oni', years: 20 },
   { type: 'series', index: 'icen_prov', years: 20 },
   { type: 'hovmoller', index: 'icen_prov', years: 20 },

@@ -76,10 +76,22 @@ function lightTheme(plot: any, width: number): any {
     layout[k] = { ...ax, linecolor: 'gray', tickcolor: 'gray', tickfont: dark(ax.tickfont),
       title: typeof ax.title === 'object' ? { ...ax.title, font: dark(ax.title.font) } : ax.title };
   });
-  const data = (plot.data ?? []).map((t: any) => !t.colorbar ? t : { ...t, colorbar: {
-    ...t.colorbar, tickfont: { ...t.colorbar.tickfont, color: '#333' },
-    title: typeof t.colorbar.title === 'object' ? { ...t.colorbar.title, font: { ...t.colorbar.title.font, color: '#333' } } : t.colorbar.title,
-  } });
+  // El backend dibuja en blanco lo que debe resaltar sobre el fondo oscuro (climatología, bordes
+  // del mes actual, líneas de umbral): sobre blanco desaparece, así que pasa a gris oscuro.
+  const ink = (c: any) => (typeof c === 'string' && /^(white|#fff(fff)?|rgba?\(255, ?255, ?255)/i.test(c)) ? '#333' : c;
+  const recolor = (o: any): any => o && typeof o === 'object' && !Array.isArray(o)
+    ? Object.fromEntries(Object.entries(o).map(([k, v]) => [k, k === 'color' ? ink(v) : recolor(v)])) : o;
+  const data = (plot.data ?? []).map((t: any) => {
+    // Solo se tocan las claves que existen: una clave presente con undefined hace fallar a Plotly
+    const trace: any = { ...t };
+    ['line', 'marker', 'error_y'].filter(k => t[k]).forEach(k => trace[k] = recolor(t[k]));
+    return !t.colorbar ? trace : { ...trace, colorbar: {
+      ...t.colorbar, tickfont: { ...t.colorbar.tickfont, color: '#333' },
+      title: typeof t.colorbar.title === 'object' ? { ...t.colorbar.title, font: { ...t.colorbar.title.font, color: '#333' } } : t.colorbar.title,
+    } };
+  });
+  layout.shapes = (layout.shapes ?? []).map(recolor);
+  layout.annotations = (layout.annotations ?? []).map((a: any) => ({ ...a, font: dark(a.font) }));
   return { data, layout };
 }
 
