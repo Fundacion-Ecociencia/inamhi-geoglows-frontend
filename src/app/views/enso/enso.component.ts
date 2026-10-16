@@ -237,9 +237,13 @@ export class EnsoComponent implements AfterViewInit, OnDestroy {
     this.timeControl?.destroy();
     this.timeControl = undefined;
     this.isPlay = false;
+    // Si el usuario pide otra ventana antes de que llegue el GetCapabilities, solo la última
+    // petición instala su control; si no, dos animaciones quedarían superpuestas en el mapa.
+    const id = this.seq['sst'] = (this.seq['sst'] ?? 0) + 1;
     const url = `${env.urlGeoserver}/${cfg.SST_WORKSPACE}/wms`;
     const all = (await this.geoserver.getAvailableDatesFromImageMosaic(url, cfg.SST_LAYER_NAME, this.sstDays))
       .map(d => d.trim()).filter(Boolean);
+    if (id !== this.seq['sst']) { return; }
     if (!all.length) {
       this.sstMessage = 'La capa de temperatura del mar aún no está publicada';
       return;
@@ -322,8 +326,10 @@ export class EnsoComponent implements AfterViewInit, OnDestroy {
                          province: r.province ?? this.river.province, canton: r.canton ?? this.river.canton };
         }
       });
+      // loadPlot devuelve null si la respuesta ya no es la vigente (otro río elegido después):
+      // en ese caso no se toca la lista, que es la del río actual.
       this.loadPlot('analogs', `analogs-plot?comid=${comid}&${size}`, width)
-        .then(r => this.analogYears = r?.years ?? []);
+        .then(r => { if (r) { this.analogYears = r.years ?? []; } });
       this.loadPlot('icen', `icen-heatmap-plot?${size}`, width);
     }, 300);
   }
