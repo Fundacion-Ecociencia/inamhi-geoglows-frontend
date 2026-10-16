@@ -14,6 +14,7 @@ export class Geoserver {
    *
    * @param url - Base WMS endpoint URL.
    * @param layer - Name of the GeoServer layer to query.
+   * @param n - How many of the latest dates to return (default 10).
    * @returns Promise that resolves to an array of ISO date strings.
    *
    * Details
@@ -21,12 +22,13 @@ export class Geoserver {
    * - Sends a GetCapabilities request to the WMS service.
    * - Parses the XML response and searches for the given layer.
    * - Extracts the "time" extent values from the layer metadata.
-   * - Returns the last 10 dates (for efficiency).
+   * - Returns the last n dates (10 by default, for efficiency).
    * - Returns an empty array if the layer or time extent is not found.
    */
   public async getAvailableDatesFromImageMosaic(
     url: string,
-    layer: string
+    layer: string,
+    n: number = 10
   ): Promise<string[]> {
     const getCapabilitiesUrl =
       `${url}?service=WMS&version=1.1.1&request=GetCapabilities`;
@@ -53,9 +55,9 @@ export class Geoserver {
         layerElement.querySelector("Extent[name='time']");
       if (!timeExtent || !timeExtent.textContent) return [];
 
-      // Split values and keep the last 10 entries
+      // Split values and keep the last n entries (10 by default)
       const dates = timeExtent.textContent.split(",");
-      return dates.slice(-10);
+      return dates.slice(-n);
 
     } catch (error) {
       console.error("Error fetching dates:", error);
