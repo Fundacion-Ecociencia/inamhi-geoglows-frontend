@@ -1,16 +1,19 @@
 /*****************************************************************************
  *                              ENSO ECUADOR                                 *
  *****************************************************************************
- * Tablero (patrón B de la skill geoglows-frontend) para vigilar El Niño desde
- * el Ecuador: estado del ENSO en el panel, anomalía de TSM del Pacífico
- * (WMS animado), caudal esperado por río según la fase (Martin), índices y
- * Hovmöller de ondas Kelvin. Contrato de la API: docs/plan-enso.md, sección 6.
+ * Vista para vigilar El Niño desde el Ecuador. Estado del ENSO en el panel y,
+ * en el área principal, una cosa a la vez a pantalla completa (patrón A de la
+ * skill geoglows-frontend), elegida en la barra superior:
+ *   - Pacífico: anomalía de TSM (WMS animado) con las regiones Niño.
+ *   - Ecuador: caudal esperado por río según la fase (Martin); clic → modal.
+ *   - Gráficas: de 1 a 4 paneles, cada uno con su tipo e índice.
+ * Contrato de la API: docs/plan-enso.md, sección 6.
  *
  * - enso.config.ts: listas de los selectores, colores y umbrales.
  * - enso.map.ts: mapa del Pacífico (Leaflet) y de Ecuador (MapLibre).
  * - enso.mock.ts: respuestas de ejemplo con localStorage 'enso_mock' = '1'.
  *****************************************************************************/
-import { AfterViewInit, Component, ElementRef, OnDestroy, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, OnDestroy, QueryList, ViewChild, ViewChildren } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -31,7 +34,6 @@ import * as cfg from './enso.config';
 import { createPacificMap, EcuadorMap } from './enso.map';
 import { mockFetch } from './enso.mock';
 
-type CellKey = 'index' | 'hovmoller' | 'composite' | 'analogs' | 'icen';
 interface PlotCell { state: 'loading' | 'ready' | 'empty'; plot?: any; }
 interface StatusCard { title: string; value: string; extra: string; label: string; date: string; color: string; }
 
@@ -94,13 +96,15 @@ function lightTheme(plot: any, width: number): any {
 })
 export class EnsoComponent implements AfterViewInit, OnDestroy {
   @ViewChild('template') template!: AppTemplateComponent;
-  @ViewChild('indexCell') indexCell!: ElementRef<HTMLElement>;
-  @ViewChild('hovmollerCell') hovmollerCell!: ElementRef<HTMLElement>;
+  @ViewChildren('chartArea') chartAreas!: QueryList<ElementRef<HTMLElement>>;
   @ViewChild('modalWidth') modalWidth!: ElementRef<HTMLElement>;
 
   public readonly cfg = cfg;
   /** El panel arranca cerrado en móvil para que el contenido no quede en 60 px. */
   public isPanelActive: boolean = window.innerWidth >= cfg.NARROW_SCREEN;
+
+  /** Qué muestra el área principal (barra superior). */
+  public mode: cfg.ViewMode = cfg.DEFAULT_MODE;
 
   /** Estado del ENSO */
   public statusCards: StatusCard[] | null = null;
@@ -110,27 +114,34 @@ export class EnsoComponent implements AfterViewInit, OnDestroy {
   public sstDays = 60;
   public sstMessage = '';
   public isPlay = false;
+  /** La animación se pausa al dejar el Pacífico y sigue al volver. */
+  private resumePlay = false;
   private pacific!: L.Map;
   private regions!: L.GeoJSON;
-  private timeControl?: WMSTimeControl;
+  public timeControl?: WMSTimeControl;
   private geoserver = new Geoserver();
 
   /** Ecuador: caudal esperado */
   public phase = 'neutra';
   public month = new Date().getMonth() + 1;
-  private ecuador!: EcuadorMap;
+  public compositeMissing = false;
+  /** Se crea la primera vez que se muestra: MapLibre no se dibuja en un contenedor oculto. */
+  private ecuador?: EcuadorMap;
 
-  /** Índices */
-  public index = 'icen_prov';
-  public years = 20;
+  /** Gráficas: los 4 paneles existen siempre; se muestran los primeros `panelCount`. */
+  public panelCount = cfg.DEFAULT_PANEL_COUNT;
+  public panelCountChoice = cfg.DEFAULT_PANEL_COUNT;
+  public charts: cfg.ChartSettings[] = cfg.CHART_DEFAULTS.map(c => ({ ...c }));
+  /** true si hay que pedir los gráficos otra vez (nunca pedidos o cambió el número de paneles). */
+  private chartsStale = true;
 
   /** Capas */
   public showProvinces = true;
   public showRegions = true;
 
-  /** Gráficos del tablero y del modal */
-  public cells: Record<CellKey, PlotCell> = {
-    index: { state: 'loading' }, hovmoller: { state: 'loading' },
+  /** Gráficos de los paneles (chart0…chart3) y del modal */
+  public cells: Record<string, PlotCell> = {
+    chart0: { state: 'loading' }, chart1: { state: 'loading' }, chart2: { state: 'loading' }, chart3: { state: 'loading' },
     composite: { state: 'loading' }, analogs: { state: 'loading' }, icen: { state: 'loading' },
   };
   private seq: Record<string, number> = {};
@@ -146,11 +157,9 @@ export class EnsoComponent implements AfterViewInit, OnDestroy {
 
   ngAfterViewInit(): void {
     ({ map: this.pacific, regions: this.regions } = createPacificMap('map-pacific'));
-    this.ecuador = new EcuadorMap('map-ecuador', L.Browser.mobile, p => this.openRiver(p));
+    // La fase del ICEN actual es la fase por defecto del mapa de Ecuador, si ya se creó.
     this.loadStatus().then(() => this.updateComposite());
     this.updateSst();
-    this.updateIndexPlot();
-    this.loadPlot('hovmoller', `hovmoller-plot?${this.cellSize(this.hovmollerCell)}`);
   }
 
   ngOnDestroy(): void {
@@ -177,7 +186,7 @@ export class EnsoComponent implements AfterViewInit, OnDestroy {
   }
 
   /** Pide una figura y la deja en su celda; si falla, la celda dice "Sin datos por ahora". */
-  private async loadPlot(key: CellKey, path: string, modalWidth?: number): Promise<any> {
+  private async loadPlot(key: string, path: string, modalWidth?: number): Promise<any> {
     const id = this.seq[key] = (this.seq[key] ?? 0) + 1;
     // Sin reasignar si ya está cargando: evita un cambio de referencia en ngAfterViewInit.
     if (this.cells[key].state !== 'loading') { this.cells[key] = { state: 'loading' }; }
@@ -197,8 +206,38 @@ export class EnsoComponent implements AfterViewInit, OnDestroy {
 
   private cellSize(cell: ElementRef<HTMLElement>): string {
     const el = cell.nativeElement;
-    // La API solo acepta enteros (un decimal responde 400).
-    return `width=${Math.round(el.offsetWidth)}&height=${Math.round(el.offsetHeight)}`;
+    // La API solo acepta enteros de 100 a 4000 (otro valor responde 400).
+    const fit = (n: number) => Math.min(4000, Math.max(100, Math.round(n)));
+    return `width=${fit(el.offsetWidth)}&height=${fit(el.offsetHeight)}`;
+  }
+
+
+  /*************************************************************************
+   *                     Barra superior: qué se muestra                    *
+   *************************************************************************/
+  public setMode(mode: cfg.ViewMode): void {
+    if (this.mode === 'pacific' && mode !== 'pacific' && this.isPlay) {
+      this.timeControl?.pause();
+      this.resumePlay = true;
+    }
+    this.mode = mode;
+    // Después de que Angular muestre el contenedor: medir y dibujar con su tamaño real.
+    setTimeout(() => this.afterShow());
+  }
+
+  private afterShow(): void {
+    if (this.mode === 'pacific') {
+      this.pacific.invalidateSize();
+      if (this.resumePlay) { this.timeControl?.play(); this.resumePlay = false; }
+    } else if (this.mode === 'ecuador') {
+      if (this.ecuador) { this.ecuador.resize(); return; }
+      this.ecuador = new EcuadorMap('map-ecuador', L.Browser.mobile, p => this.openRiver(p));
+      if (!this.showProvinces) { this.ecuador.setProvinces(false); }
+      this.updateComposite();
+    } else if (this.chartsStale) {
+      this.chartsStale = false;
+      this.charts.slice(0, this.panelCount).forEach((_, i) => this.loadChart(i));
+    }
   }
 
 
@@ -233,10 +272,17 @@ export class EnsoComponent implements AfterViewInit, OnDestroy {
   /*************************************************************************
    *                       Pacífico: anomalía de TSM                       *
    *************************************************************************/
+  /** "Actualizar" del panel: recarga y muestra el Pacífico. */
+  public applySst(): void {
+    this.setMode('pacific');
+    this.updateSst();
+  }
+
   public async updateSst(): Promise<void> {
     this.timeControl?.destroy();
     this.timeControl = undefined;
     this.isPlay = false;
+    this.resumePlay = false;
     // Si el usuario pide otra ventana antes de que llegue el GetCapabilities, solo la última
     // petición instala su control; si no, dos animaciones quedarían superpuestas en el mapa.
     const id = this.seq['sst'] = (this.seq['sst'] ?? 0) + 1;
@@ -245,7 +291,7 @@ export class EnsoComponent implements AfterViewInit, OnDestroy {
       .map(d => d.trim()).filter(Boolean);
     if (id !== this.seq['sst']) { return; }
     if (!all.length) {
-      this.sstMessage = 'La capa de temperatura del mar aún no está publicada';
+      this.sstMessage = 'La capa de temperatura del mar aún no está publicada en GeoServer';
       return;
     }
     this.sstMessage = '';
@@ -275,31 +321,75 @@ export class EnsoComponent implements AfterViewInit, OnDestroy {
 
 
   /*************************************************************************
-   *                Ecuador, índices y capas del panel                     *
+   *                     Ecuador: caudal esperado                          *
    *************************************************************************/
-  public updateComposite(): void {
+  /** "Actualizar" del panel: muestra Ecuador (si se crea ahí, la creación ya aplica fase y mes). */
+  public applyComposite(): void {
+    const created = !!this.ecuador;
+    this.setMode('ecuador');
+    if (created) { this.updateComposite(); }
+  }
+
+  public async updateComposite(): Promise<void> {
+    if (!this.ecuador) { return; }
+    const id = this.seq['ecuadorMap'] = (this.seq['ecuadorMap'] ?? 0) + 1;
     const phase = cfg.PHASES.find(p => p.value === this.phase)?.label ?? this.phase;
     const month = cfg.MONTHS.find(m => m.value === this.month)?.label ?? String(this.month);
-    this.ecuador.setComposite(this.phase, this.month, phase, month);
+    const ok = await this.ecuador.setComposite(this.phase, this.month, phase, month);
+    if (id === this.seq['ecuadorMap']) { this.compositeMissing = !ok; }
   }
 
-  public updateIndexPlot(): void {
-    this.loadPlot('index', `index-plot?index=${this.index}&years=${this.years}&${this.cellSize(this.indexCell)}`);
+
+  /*************************************************************************
+   *                               Gráficas                                *
+   *************************************************************************/
+  public get layout() { return cfg.CHART_LAYOUTS[this.panelCount]; }
+
+  /** "Mostrar gráficas" del panel: aplica el número de paneles y cambia al modo Gráficas. */
+  public showCharts(): void {
+    if (this.panelCountChoice !== this.panelCount) {
+      this.panelCount = this.panelCountChoice;
+      this.chartsStale = true;   // cambió el tamaño de cada celda: se piden otra vez
+    }
+    this.setMode('charts');
   }
 
-  public toggleProvinces(): void { this.ecuador.setProvinces(this.showProvinces); }
+  /** Cambio de tipo, índice o años en la cabecera de un panel. */
+  public onChartChange(i: number): void {
+    // Espera a que se dibuje la cabecera (el selector de años aparece o desaparece).
+    setTimeout(() => this.loadChart(i));
+  }
+
+  private loadChart(i: number): void {
+    const area = this.chartAreas.get(i);
+    if (!area) { return; }
+    const { type, index, years } = this.charts[i];
+    const endpoint = cfg.CHART_TYPES.find(t => t.value === type)?.endpoint;
+    const params = type === 'series' ? `index=${index}&years=${years}&`
+                 : type === 'heatmap' ? `index=${index}&` : '';
+    this.loadPlot(`chart${i}`, `${endpoint}?${params}${this.cellSize(area)}`);
+  }
+
+
+  /*************************************************************************
+   *                          Capas del panel                              *
+   *************************************************************************/
+  public toggleProvinces(): void { this.ecuador?.setProvinces(this.showProvinces); }
 
   public toggleRegions(): void {
     this.showRegions ? this.regions.addTo(this.pacific) : this.regions.remove();
   }
 
-  /** Al abrir o cerrar el panel cambia el ancho: mapas y gráficos se reajustan. */
+  /**
+   * Al abrir o cerrar el panel cambia el ancho: se reajusta lo que está a la vista
+   * (los gráficos ocupan su celda con autosize). Lo oculto se reajusta al mostrarse.
+   */
   public onPanelToggle(isActive: boolean): void {
     this.isPanelActive = isActive;
     setTimeout(() => {
-      this.pacific?.invalidateSize();
-      this.ecuador?.resize();
-      window.dispatchEvent(new Event('resize'));
+      if (this.mode === 'pacific') { this.pacific?.invalidateSize(); }
+      if (this.mode === 'ecuador') { this.ecuador?.resize(); }
+      if (this.mode === 'charts') { window.dispatchEvent(new Event('resize')); }
     }, 250);
   }
 
@@ -312,7 +402,7 @@ export class EnsoComponent implements AfterViewInit, OnDestroy {
                    province: props.province ?? '', canton: props.canton ?? '' };
     this.analogYears = [];
     this.csvError = false;
-    (['composite', 'analogs', 'icen'] as CellKey[]).forEach(k => this.cells[k] = { state: 'loading' });
+    ['composite', 'analogs', 'icen'].forEach(k => this.cells[k] = { state: 'loading' });
     this.template.showDataModal();
 
     // Como Hydroviewer: se mide el ancho cuando el modal ya está abierto.

@@ -90,7 +90,7 @@ export class LegendControlEnso {
 
   private render(): void {
     if (!this._container) { return; }
-    // Dos columnas para que la leyenda no tape media celda del tablero.
+    // Dos columnas para que la leyenda ocupe poco alto en el teléfono.
     const swatch = (color: string, label: string) =>
       `<span><span style="display:inline-block;width:18px;height:4px;margin:0 5px 3px 0;` +
       `background:${color}"></span>${label}</span>`;
@@ -187,24 +187,28 @@ export class EcuadorMap {
     map.on('mouseleave', HIT_LAYER, () => { map.getCanvas().style.cursor = ''; });
   }
 
-  /** Cambiar la fase o el mes cambia la URL de la fuente: se quita y se vuelve a agregar. */
-  public async setComposite(phase: string, month: number, phaseLabel: string, monthLabel: string) {
+  /**
+   * Cambiar la fase o el mes cambia la URL de la fuente: se quita y se vuelve a agregar.
+   * Devuelve false si Martin no tiene la capa, para que la vista lo diga sobre el mapa.
+   */
+  public async setComposite(phase: string, month: number, phaseLabel: string, monthLabel: string): Promise<boolean> {
     await this.ready;
     const map = this.map;
     if (map.getLayer(COMPOSITE_LAYER)) { map.removeLayer(COMPOSITE_LAYER); }
     if (map.getSource(COMPOSITE)) { map.removeSource(COMPOSITE); }
     this.legend.update(phaseLabel, monthLabel, false);
-    // MapLibre toma una tesela 404 como vacía y no avisa: si la función aún no
-    // existe en Martin, su TileJSON da 404 y se dice en la leyenda. Los tramos
-    // quedan en gris (sin dato), sin romper la vista.
-    fetch(`${env.urlMartin}/${COMPOSITE}`).then(r => r.ok, () => false)
-      .then(ok => { if (!ok) { this.legend.update(phaseLabel, monthLabel, true); } });
     const params = `phase=${encodeURIComponent(phase)}&month=${month}`;
     map.addSource(COMPOSITE, { type: 'vector', tiles: [`${env.urlMartin}/${COMPOSITE}/{z}/{x}/{y}?${params}`] });
     map.addLayer({
       id: COMPOSITE_LAYER, type: 'line', source: COMPOSITE, 'source-layer': COMPOSITE_SOURCE_LAYER,
       paint: { 'line-color': RATIO_COLOR, 'line-width': LINE_WIDTH },
     }, HIT_LAYER);
+    // MapLibre toma una tesela 404 como vacía y no avisa: si la función aún no
+    // existe en Martin, su TileJSON da 404 y se dice en la leyenda. Los tramos
+    // quedan en gris (sin dato), sin romper la vista.
+    const ok = await fetch(`${env.urlMartin}/${COMPOSITE}`).then(r => r.ok, () => false);
+    if (!ok) { this.legend.update(phaseLabel, monthLabel, true); }
+    return ok;
   }
 
   public async setProvinces(visible: boolean) {

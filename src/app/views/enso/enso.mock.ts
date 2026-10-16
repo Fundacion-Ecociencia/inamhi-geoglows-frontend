@@ -28,7 +28,7 @@ const phases = ['Cálida moderada o mayor', 'Cálida débil', 'Neutra', 'Fría']
 const phaseColors = ['#b2182b', '#f4a582', '#bdbdbd', '#2166ac'];
 const mes = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
-const RESPONSES: Record<string, () => any> = {
+const RESPONSES: Record<string, (query: URLSearchParams) => any> = {
   'status': () => ({
     coastal: { index: 'icen_prov', value: 1.12, date: '2026-09-01', phase: 'calida_moderada', label: 'Cálida moderada', phase_group: 'calida_debil' },
     global: { index: 'roni', value: 1.69, date: '2026-09-01', phase: 'el_nino', label: 'El Niño' },
@@ -45,12 +45,18 @@ const RESPONSES: Record<string, () => any> = {
       colorbar: { title: { text: '°C' } } }],
     layout: dark('Fecha', 'Longitud (°E)'),
   } }),
-  'icen-heatmap-plot': () => ({ plot: {
-    data: [{ type: 'heatmap', x: mes, y: Array.from({ length: 20 }, (_, i) => 2007 + i), colorscale: 'RdBu',
-      zmin: -3, zmax: 3, z: Array.from({ length: 20 }, (_, j) => mes.map((_, i) => series[j * 12 + i])),
-      colorbar: { title: { text: 'ICEN (°C)' } } }],
-    layout: dark('Año', 'Mes'),
-  } }),
+  // index-heatmap-plot tiene la misma forma; con ?index=oni la amplitud baja a la mitad para que,
+  // lado a lado, se vea la diferencia entre la costa y el Pacífico central.
+  'icen-heatmap-plot': (q) => {
+    const index = q.get('index') ?? 'icen', k = index === 'oni' ? 0.5 : 1;
+    return { plot: {
+      data: [{ type: 'heatmap', x: mes, y: Array.from({ length: 20 }, (_, i) => 2007 + i), colorscale: 'RdBu',
+        zmin: -3, zmax: 3,
+        z: Array.from({ length: 20 }, (_, j) => mes.map((_, i) => +(k * series[j * 12 + i]).toFixed(2))),
+        colorbar: { title: { text: `${index.toUpperCase()} (°C)` } } }],
+      layout: dark('Año', 'Mes'),
+    } };
+  },
   'composite-plot': () => ({
     river: 'Río Daule', province: 'Guayas', canton: 'Daule', phase_now: 'calida_debil',
     plot: {
@@ -78,8 +84,8 @@ export async function mockFetch(url: string): Promise<Response> {
     return new Response('comid,month,phase,q_mean,ratio,n_years\n9035711,1,calida_fuerte,812.4,1.62,4\n',
       { status: 200, headers: { 'Content-Type': 'text/csv' } });
   }
-  const make = RESPONSES[endpoint];
+  const make = RESPONSES[endpoint === 'index-heatmap-plot' ? 'icen-heatmap-plot' : endpoint];
   if (!make) { return new Response('{}', { status: 404 }); }
   // 'NaN' entre comillas se vuelve NaN literal, como lo manda el backend de Python.
-  return new Response(JSON.stringify(make()).replace(/"NaN"/g, 'NaN'), { status: 200 });
+  return new Response(JSON.stringify(make(new URL(url).searchParams)).replace(/"NaN"/g, 'NaN'), { status: 200 });
 }

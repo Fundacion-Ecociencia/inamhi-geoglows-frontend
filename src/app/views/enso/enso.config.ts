@@ -113,6 +113,7 @@ export const RATIO_NULL_COLOR = '#555';
 /*---------------------------------------------------------------------------*/
 /*                                  Índices                                  */
 /*---------------------------------------------------------------------------*/
+/** Los 12 que acepta la API (INDICES de backend/enso/controllers.py). */
 export const INDICES: Option[] = [
   { value: 'icen', label: 'ICEN costero oficial' },
   { value: 'icen_prov', label: 'ICEN provisional' },
@@ -121,8 +122,63 @@ export const INDICES: Option[] = [
   { value: 'nino12_week', label: 'Niño 1+2 semanal' },
   { value: 'nino34_week', label: 'Niño 3.4 semanal' },
   { value: 'nino12', label: 'Niño 1+2 mensual' },
+  { value: 'nino3', label: 'Niño 3 mensual' },
   { value: 'nino34', label: 'Niño 3.4 mensual' },
+  { value: 'nino4', label: 'Niño 4 mensual' },
   { value: 'soi', label: 'SOI' },
   { value: 'mei', label: 'MEI.v2' },
 ];
 export const INDEX_YEARS: number[] = [10, 20, 40, 80];
+
+
+
+/*---------------------------------------------------------------------------*/
+/*                          Vistas del área principal                        */
+/*---------------------------------------------------------------------------*/
+export type ViewMode = 'pacific' | 'ecuador' | 'charts';
+
+/** Botones de la barra superior. `short` es el texto cuando no cabe el largo (móvil). */
+export const VIEW_MODES: { value: ViewMode; label: string; short: string; icon: string }[] = [
+  { value: 'pacific', label: 'Pacífico: anomalía de TSM', short: 'Pacífico', icon: 'fa-solid fa-water' },
+  { value: 'ecuador', label: 'Ecuador: caudal esperado', short: 'Ecuador', icon: 'fa-solid fa-arrow-trend-up' },
+  { value: 'charts', label: 'Gráficas', short: 'Gráficas', icon: 'fa-solid fa-chart-column' },
+];
+/** El Pacífico se crea al abrir la vista; Ecuador, la primera vez que se muestra. */
+export const DEFAULT_MODE: ViewMode = 'pacific';
+
+
+/*---------------------------------------------------------------------------*/
+/*                                  Gráficas                                 */
+/*---------------------------------------------------------------------------*/
+export type ChartType = 'series' | 'heatmap' | 'hovmoller';
+
+/** Tipos de gráfico de cada panel y su endpoint en /api/enso/. */
+export const CHART_TYPES: (Option<ChartType> & { endpoint: string })[] = [
+  { value: 'series', label: 'Serie de un índice', endpoint: 'index-plot' },
+  { value: 'heatmap', label: 'Año × mes de un índice', endpoint: 'index-heatmap-plot' },
+  { value: 'hovmoller', label: 'Ondas Kelvin (Hovmöller)', endpoint: 'hovmoller-plot' },
+];
+
+export interface ChartSettings { type: ChartType; index: string; years: number; }
+
+/**
+ * Lo que muestra cada panel al abrir la vista. Los dos primeros (los visibles
+ * por defecto) ponen lado a lado el ICEN y el ONI año por mes: un mismo
+ * episodio se ve grave en la costa y moderado en el Pacífico central.
+ */
+export const CHART_DEFAULTS: ChartSettings[] = [
+  { type: 'heatmap', index: 'icen_prov', years: 20 },
+  { type: 'heatmap', index: 'oni', years: 20 },
+  { type: 'series', index: 'icen_prov', years: 20 },
+  { type: 'hovmoller', index: 'icen_prov', years: 20 },
+];
+export const PANEL_COUNTS: number[] = [1, 2, 3, 4];
+export const DEFAULT_PANEL_COUNT = 2;
+
+/** Cuadrícula por número de paneles; `wide` es el panel que ocupa todo el ancho. */
+export const CHART_LAYOUTS: Record<number, { columns: number; rows: number; wide?: number }> = {
+  1: { columns: 1, rows: 1 },
+  2: { columns: 2, rows: 1 },
+  3: { columns: 2, rows: 2, wide: 2 },
+  4: { columns: 2, rows: 2 },
+};
