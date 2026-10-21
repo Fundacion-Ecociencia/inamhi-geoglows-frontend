@@ -23,7 +23,7 @@
       } @else {
         <div class="status-card status-empty">Cargando…</div>
       }
-      <div class="panel-note"><b>Nota:</b> ICEN oficial (IGP) con dos meses de atraso; el provisional se calcula igual sobre OISST.</div>
+      <div class="panel-note"><b>Nota:</b> ICEN oficial (IGP) con dos meses de atraso; el provisional se calcula igual sobre OISST. El mar frente a la costa es la temperatura real (no la anomalía); sobre 26,5 °C, en enero a abril, la lluvia de la costa suele salir sobre lo normal (estaciones del INAMHI 1981–2019).</div>
     </app-dropdown>
 
     <app-dropdown iconClass="fa-solid fa-water" title="Pacífico: anomalía de TSM">
@@ -184,8 +184,8 @@
                 <div class="chart-field chart-field-index">
                   <mat-form-field class="scaled" appearance="outline" subscriptSizing="dynamic">
                     <mat-label>Índice:</mat-label>
-                    <mat-select [(ngModel)]="chart.index" [disabled]="chart.type === 'hovmoller'" (selectionChange)="onChartChange(i)">
-                      @for (x of cfg.INDICES; track x.value) {
+                    <mat-select [(ngModel)]="chart.index" [disabled]="chart.type === 'hovmoller' || chart.type === 'coastal'" (selectionChange)="onChartChange(i)">
+                      @for (x of (chart.type === 'nmme' ? cfg.NMME_INDICES : cfg.INDICES); track x.value) {
                         <mat-option class="scaled-text" [value]="x.value">{{ x.label }}</mat-option>
                       }
                     </mat-select>
@@ -317,6 +317,28 @@
     <p>
       Se usan los umbrales del ENFEN (2024) sobre el ICEN: cálida moderada o mayor, más de 1,3 °C; cálida débil,
       de 0,5 a 1,3 °C; neutra, de −0,7 a 0,5 °C; fría, menos de −0,7 °C.
+    </p>
+    <h3>Termómetro de la costa</h3>
+    <p>
+      La lluvia de la costa responde a la temperatura real del mar frente a ella, no solo a su anomalía: cuando el
+      agua pasa de cierto umbral, el aire de abajo se calienta y se humedece y la convección se dispara. Con las
+      estaciones costeras del INAMHI (1981–2019) se midió que, de enero a abril, con el mar de la franja costera (4°S a
+      1,5°N, 82° a 80,4°O) sobre 26,5 °C la lluvia del mes cae en el tercio alto la mitad de las veces o más, y sobre
+      27,5 °C, tres de cada cuatro (un mes cualquiera: una de cada tres). La tarjeta del estado muestra la media de los
+      últimos 7 días; el gráfico "Termómetro de la costa" compara la temporada en curso (julio a junio) con 1982-83,
+      1997-98, 2015-16, 2017 y 2023. Fuera de la temporada de lluvias el mar caliente llueve menos: el umbral se lee
+      para enero a abril.
+    </p>
+    <h3>Pronóstico del Niño (NMME)</h3>
+    <p>
+      La pluma muestra la anomalía de la temperatura del mar pronosticada para los próximos nueve meses por cada modelo
+      del North American Multi-Model Ensemble (NOAA CPC) y por su media, junto con lo observado en los últimos doce
+      meses. Para Niño 1+2 se calcula aquí la media de la región frente a la costa (sin las celdas de tierra) y el
+      <i>ICEN estimado</i>: la media móvil de tres meses de lo observado y del pronóstico, la misma idea del ICEN
+      temporal que usa el ENFEN. Las líneas punteadas son las categorías del ENFEN (Niño 1+2) o de NOAA (Niño 3.4).
+      Los modelos aciertan mejor el Pacífico central que la costa: el Niño costero de 2017 casi no se pronosticó, y en
+      octubre de 2026 el promedio de los modelos para Niño 1+2 quedó cerca de un grado por debajo de lo observado. El
+      pronóstico oficial para el Ecuador y el Perú es el del ENFEN.
     </p>
     <h3>Caudal esperado: cómo leer el mapa</h3>
     <p>

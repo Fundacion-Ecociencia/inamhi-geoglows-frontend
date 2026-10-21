@@ -34,7 +34,39 @@ const RESPONSES: Record<string, (query: URLSearchParams) => any> = {
     global: { index: 'roni', value: 1.69, date: '2026-09-01', phase: 'el_nino', label: 'El Niño' },
     oni: { index: 'oni', value: 2.16, date: '2026-09-01', phase: 'el_nino', label: 'El Niño' },
     nino12_week: { value: 1.84, date: '2026-10-07' },
+    coastal_sst: { date: '2026-10-19', sst: 27.6, anom: 3.9, level: 'muy_probable',
+      label: 'Lluvia sobre lo normal muy probable en temporada', thresholds: { probable: 26.5, muy_probable: 27.5 } },
   }),
+  'nmme-plume-plot': () => {
+    const m = Array.from({ length: 21 }, (_, i) => `${2025 + Math.floor((i + 9) / 12)}-${String(((i + 9) % 12) + 1).padStart(2, '0')}-01`);
+    const obs = m.slice(0, 12), fc = m.slice(12);
+    const model = (name: string, k: number, color: string) => ({ type: 'scatter', mode: 'lines', name, x: fc,
+      y: fc.map((_, i) => +(4.4 - (0.2 + 0.1 * k) * i).toFixed(2)), line: { color, width: 1.3 } });
+    const layout: any = dark('Anomalía Niño 1+2 (°C)', 'Mes');
+    layout.shapes = [0.5, 1.3, 2.1, 3.5].map(y => ({ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: y, y1: y,
+      line: { color: '#9AA0A6', width: 1, dash: 'dot' } }));
+    return { init: '2026-10-01', models: ['CFSv2', 'CanESM5'], plot: { layout, data: [
+      model('CFSv2', 0, '#66c5cc'), model('CanESM5', 3, '#f6cf71'),
+      { ...model('NMME (media de los modelos)', 1, 'white'), line: { color: 'white', width: 3.5 } },
+      { type: 'scatter', mode: 'lines+markers', name: 'Niño 1+2 observado (ERSST)', x: obs,
+        y: obs.map((_, i) => +(0.3 * i + 0.5).toFixed(2)), line: { color: '#FCBF10', width: 3 } },
+    ] } };
+  },
+  'coastal-sst-plot': () => {
+    const days = Array.from({ length: 365 }, (_, i) => i);
+    const clim = days.map(i => +(24 - 2.2 * Math.cos(2 * Math.PI * (i - 20) / 365)).toFixed(2));
+    const line = (name: string, extra: number, color: string, width = 1.5, n = 365) => ({
+      type: 'scatter', mode: 'lines', name, x: days.slice(0, n), line: { color, width },
+      y: days.slice(0, n).map(i => +(clim[i] + extra * Math.sin(Math.PI * Math.min(i, 300) / 300)).toFixed(2)) });
+    const layout: any = dark('TSM franja costera (°C)', 'Temporada (julio a junio), media de 7 días');
+    layout.shapes = [26.5, 27.5].map((y, k) => ({ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: y, y1: y,
+      line: { color: '#FCBF10', width: 1, dash: k ? 'dot' : 'dash' } }));
+    return { thresholds: { probable: 26.5, muy_probable: 27.5 }, plot: { layout, data: [
+      { ...line('Climatología 1991–2020', 0, 'white', 3) },
+      line('1997-98', 3.2, '#66c2a5'), line('2015-16', 1.5, '#fc8d62'),
+      line('2026-27 (en curso)', 3.6, '#FCBF10', 3.5, 110),
+    ] } };
+  },
   'index-plot': () => ({ plot: {
     data: [{ type: 'bar', x: months, y: series, marker: { color: series.map(barColor) }, name: 'Índice' }],
     layout: dark('Anomalía (°C)', 'Fecha'),
