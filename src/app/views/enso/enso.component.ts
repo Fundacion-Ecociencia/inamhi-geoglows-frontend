@@ -276,16 +276,16 @@ export class EnsoComponent implements AfterViewInit, OnDestroy {
         card('Pacífico central (RONI)', g, cfg.ONI_LIMITS, o.value != null ? `(ONI ${formatValue(o.value)})` : ''),
         card('Niño 1+2 semanal', w, cfg.ICEN_LIMITS, '', w.date ? `semana del ${w.date.slice(0, 10)}` : ''),
       ];
-      // Termómetro de la costa: TSM absoluta (no anomalía), media de 7 días
+      // TSM costera absoluta (no anomalía), media de 7 días, frente al umbral convectivo
       const t = s.coastal_sst;
       if (t && t.sst !== null && t.sst !== undefined) {
         this.statusCards.push({
-          title: 'Mar frente a la costa (7 días)',
+          title: 'TSM costera (media 7 d)',
           value: `${Number(t.sst).toFixed(1).replace('.', ',')} °C`,
           extra: t.anom !== null && t.anom !== undefined ? `(${formatValue(t.anom)})` : '',
           label: t.label ?? 'Sin umbral calibrado',
           date: (t.date ?? '').slice(0, 10) || '—',
-          color: cfg.THERMO_COLORS[t.level] ?? cfg.PHASE_COLORS.neutral,
+          color: cfg.COASTAL_SST_COLORS[t.level] ?? cfg.PHASE_COLORS.neutral,
         });
       }
       this.phase = c.phase_group ?? cfg.phaseGroupFromIcen(c.value);

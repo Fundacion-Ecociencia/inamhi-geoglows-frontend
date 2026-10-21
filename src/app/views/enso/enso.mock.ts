@@ -35,7 +35,7 @@ const RESPONSES: Record<string, (query: URLSearchParams) => any> = {
     oni: { index: 'oni', value: 2.16, date: '2026-09-01', phase: 'el_nino', label: 'El Niño' },
     nino12_week: { value: 1.84, date: '2026-10-07' },
     coastal_sst: { date: '2026-10-19', sst: 27.6, anom: 3.9, level: 'muy_probable',
-      label: 'Lluvia sobre lo normal muy probable en temporada', thresholds: { probable: 26.5, muy_probable: 27.5 } },
+      label: '≥ umbral convectivo alto (27,5 °C)', thresholds: { probable: 26.5, muy_probable: 27.5 } },
   }),
   'nmme-plume-plot': () => {
     const m = Array.from({ length: 21 }, (_, i) => `${2025 + Math.floor((i + 9) / 12)}-${String(((i + 9) % 12) + 1).padStart(2, '0')}-01`);

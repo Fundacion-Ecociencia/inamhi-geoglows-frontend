@@ -38,8 +38,8 @@ export const PHASE_LABELS: Record<PhaseClass, string> = {
 export const ICEN_LIMITS: [number, number] = [-0.7, 0.5];
 export const ONI_LIMITS: [number, number] = [-0.5, 0.5];
 
-/** Borde de la tarjeta del termómetro de la costa según el nivel calibrado con la lluvia. */
-export const THERMO_COLORS: Record<string, string> = {
+/** Borde de la tarjeta de TSM costera según el nivel respecto al umbral convectivo calibrado. */
+export const COASTAL_SST_COLORS: Record<string, string> = {
   muy_probable: '#E34A33', probable: '#FDAE6B', bajo: '#9AA0A6',
 };
 
@@ -214,7 +214,7 @@ export const CHART_TYPES: (Option<ChartType> & { endpoint: string })[] = [
   { value: 'series', label: 'Serie de un índice', endpoint: 'index-plot' },
   { value: 'heatmap', label: 'Año × mes de un índice', endpoint: 'index-heatmap-plot' },
   { value: 'hovmoller', label: 'Ondas Kelvin (Hovmöller)', endpoint: 'hovmoller-plot' },
-  { value: 'coastal', label: 'Termómetro de la costa', endpoint: 'coastal-sst-plot' },
+  { value: 'coastal', label: 'TSM costera absoluta y umbral convectivo', endpoint: 'coastal-sst-plot' },
   { value: 'nmme', label: 'Pronóstico del Niño (NMME)', endpoint: 'nmme-plume-plot' },
 ];
 
