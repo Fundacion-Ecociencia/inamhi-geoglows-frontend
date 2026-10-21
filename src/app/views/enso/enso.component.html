@@ -58,10 +58,28 @@
           }
         </mat-select>
       </mat-form-field>
+      <mat-form-field class="select scaled" appearance="outline">
+        <mat-label>Medida:</mat-label>
+        <mat-select [(ngModel)]="metric">
+          @for (m of cfg.METRICS; track m.value) {
+            <mat-option class="scaled-text" [value]="m.value">{{ m.label }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      @if (metric === 'prob') {
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" id="enso-check-mask" [(ngModel)]="maskNonSignificant">
+          <label class="form-check-label" for="enso-check-mask">Atenuar lo no significativo</label>
+        </div>
+      }
       <button mat-stroked-button class="dark-mode update-button scaled" (click)="applyComposite()">
         <i class="fa-solid fa-arrows-rotate" style="margin-right: 4px;"></i> Actualizar
       </button>
-      <div class="panel-note"><b>Nota:</b> caudal medio del mes en los años con esa fase del ICEN, respecto a la media de todos los años (GEOGLOWS 1980–2026). Fases del ENFEN: cálida moderada o mayor, ICEN &gt; 1,3; cálida débil, 0,5 a 1,3; neutra, −0,7 a 0,5; fría, &lt; −0,7.</div>
+      @if (metric === 'prob') {
+        <div class="panel-note"><b>Nota:</b> en los años con esa fase del ICEN, qué fracción tuvo el caudal del mes en el tercio alto (rojo) o en el bajo (azul) de todos los años (GEOGLOWS 1980–2026). En un año cualquiera es 33 %. Con 3 o 4 años por mes, la señal puede no ser significativa: actívelo arriba para verlo. Fases del ENFEN: cálida moderada o mayor, ICEN &gt; 1,3; cálida débil, 0,5 a 1,3; neutra, −0,7 a 0,5; fría, &lt; −0,7.</div>
+      } @else {
+        <div class="panel-note"><b>Nota:</b> caudal medio del mes en los años con esa fase del ICEN, respecto a la media de todos los años (GEOGLOWS 1980–2026). En ríos casi secos la razón exagera, y un solo año extremo puede dominarla. Fases del ENFEN: cálida moderada o mayor, ICEN &gt; 1,3; cálida débil, 0,5 a 1,3; neutra, −0,7 a 0,5; fría, &lt; −0,7.</div>
+      }
     </app-dropdown>
 
     <app-dropdown iconClass="fa-solid fa-chart-column" title="Gráficas">
@@ -299,6 +317,21 @@
     <p>
       Se usan los umbrales del ENFEN (2024) sobre el ICEN: cálida moderada o mayor, más de 1,3 °C; cálida débil,
       de 0,5 a 1,3 °C; neutra, de −0,7 a 0,5 °C; fría, menos de −0,7 °C.
+    </p>
+    <h3>Caudal esperado: cómo leer el mapa</h3>
+    <p>
+      Por defecto, el mapa muestra la <b>probabilidad por terciles</b>, la misma forma de los mapas ENSO del IRI y de
+      los pronósticos estacionales: para cada río y mes se divide la historia en tres partes iguales (caudal bajo,
+      normal y alto) y se cuenta en cuántos de los años con esa fase del ICEN el caudal cayó en el tercio alto (rojo) o
+      en el bajo (azul). En un año cualquiera cada tercio tiene 33 %. "Muy probable" es 70 % o más. Esta medida no se
+      exagera en ríos casi secos ni la domina un solo año extremo, como sí le pasa a la razón de medias, que sigue
+      disponible en el selector "Medida".
+    </p>
+    <p>
+      "Atenuar lo no significativo" aplica una prueba hipergeométrica por río y corrige por la cantidad de ríos
+      (control de falsos descubrimientos al 10 %). Con 3 o 4 años por mes, como en enero o febrero para la fase cálida
+      moderada o mayor, casi nada pasa la prueba aunque 3 de cada 4 años hayan sido altos: es un límite de la muestra,
+      no la ausencia de señal.
     </p>
     <h3>Advertencia</h3>
     <p>

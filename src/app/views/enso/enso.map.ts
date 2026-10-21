@@ -11,7 +11,8 @@ import * as L from 'leaflet';
 import maplibregl from 'maplibre-gl';
 import { env } from '../../../environments/environment';
 import {
-  CARTO_ATTRIBUTION, NINO_REGIONS, RATIO_CLASSES, RATIO_NULL_COLOR,
+  CARTO_ATTRIBUTION, CompositeMetric, maskOpacity, NINO_REGIONS, PROB_CLASSES, probColorExpression,
+  RATIO_CLASSES, RATIO_NULL_COLOR,
 } from './enso.config';
 
 const VOYAGER = `https://basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}.png?key=${env.cartoKey}`;
@@ -69,6 +70,8 @@ export class LegendControlEnso {
   private phase = '';
   private month = '';
   private missing = false;
+  private metric: CompositeMetric = 'prob';
+  private mask = false;
 
   onAdd() {
     this._container = document.createElement('div');
@@ -83,8 +86,9 @@ export class LegendControlEnso {
 
   onRemove() { this._container?.parentNode?.removeChild(this._container); }
 
-  public update(phase: string, month: string, missing: boolean): void {
-    Object.assign(this, { phase, month, missing });
+  public update(phase: string, month: string, missing: boolean, metric: CompositeMetric = this.metric,
+                mask: boolean = this.mask): void {
+    Object.assign(this, { phase, month, missing, metric, mask });
     this.render();
   }
 
@@ -94,12 +98,18 @@ export class LegendControlEnso {
     const swatch = (color: string, label: string) =>
       `<span><span style="display:inline-block;width:18px;height:4px;margin:0 5px 3px 0;` +
       `background:${color}"></span>${label}</span>`;
+    const prob = this.metric === 'prob';
     this._container.innerHTML =
-      `<b>Caudal esperado / caudal medio</b><br>` +
+      (prob ? `<b>Probabilidad de caudal en el tercio alto o bajo</b><br>`
+            : `<b>Caudal esperado / caudal medio</b><br>`) +
       `<b>Fase:</b> ${this.phase}<br><b>Mes:</b> ${this.month}` +
-      `<div style="display:grid;grid-template-columns:1fr 1fr;column-gap:8px">` +
-      RATIO_CLASSES.map(c => swatch(c.color, c.label)).join('') +
-      swatch(RATIO_NULL_COLOR, 'Sin dato') + `</div>` +
+      (prob
+        ? `<div>${PROB_CLASSES.map(c => swatch(c.color, c.label)).join('<br>')}<br>${swatch(RATIO_NULL_COLOR, 'Sin dato')}</div>` +
+          `<div style="color:#444">Base: 33 % (un año cualquiera)` +
+          (this.mask ? `<br>Tenue: no significativo (FDR 10 %)` : '') + `</div>`
+        : `<div style="display:grid;grid-template-columns:1fr 1fr;column-gap:8px">` +
+          RATIO_CLASSES.map(c => swatch(c.color, c.label)).join('') +
+          swatch(RATIO_NULL_COLOR, 'Sin dato') + `</div>`) +
       (this.missing ? `<div style="color:#b2182b"><b>La capa de caudal esperado aún no está publicada.</b></div>` : '');
   }
 }
@@ -129,6 +139,8 @@ const RATIO_COLOR: any = [
   ['step', ['to-number', ['get', 'ratio']], RATIO_CLASSES[0].color,
     ...RATIO_CLASSES.slice(1).flatMap((c, i) => [RATIO_CLASSES[i].limit, c.color])],
 ];
+
+const PROB_COLOR = probColorExpression();
 
 export class EcuadorMap {
   public map: maplibregl.Map;
@@ -191,23 +203,28 @@ export class EcuadorMap {
    * Cambiar la fase o el mes cambia la URL de la fuente: se quita y se vuelve a agregar.
    * Devuelve false si Martin no tiene la capa, para que la vista lo diga sobre el mapa.
    */
-  public async setComposite(phase: string, month: number, phaseLabel: string, monthLabel: string): Promise<boolean> {
+  public async setComposite(phase: string, month: number, phaseLabel: string, monthLabel: string,
+                            metric: CompositeMetric = 'prob', mask = false): Promise<boolean> {
     await this.ready;
     const map = this.map;
     if (map.getLayer(COMPOSITE_LAYER)) { map.removeLayer(COMPOSITE_LAYER); }
     if (map.getSource(COMPOSITE)) { map.removeSource(COMPOSITE); }
-    this.legend.update(phaseLabel, monthLabel, false);
+    this.legend.update(phaseLabel, monthLabel, false, metric, mask);
     const params = `phase=${encodeURIComponent(phase)}&month=${month}`;
     map.addSource(COMPOSITE, { type: 'vector', tiles: [`${env.urlMartin}/${COMPOSITE}/{z}/{x}/{y}?${params}`] });
     map.addLayer({
       id: COMPOSITE_LAYER, type: 'line', source: COMPOSITE, 'source-layer': COMPOSITE_SOURCE_LAYER,
-      paint: { 'line-color': RATIO_COLOR, 'line-width': LINE_WIDTH },
+      paint: {
+        'line-color': metric === 'prob' ? PROB_COLOR : RATIO_COLOR,
+        'line-width': LINE_WIDTH,
+        'line-opacity': metric === 'prob' ? maskOpacity(mask) : 1,
+      },
     }, HIT_LAYER);
     // MapLibre toma una tesela 404 como vacía y no avisa: si la función aún no
     // existe en Martin, su TileJSON da 404 y se dice en la leyenda. Los tramos
     // quedan en gris (sin dato), sin romper la vista.
     const ok = await fetch(`${env.urlMartin}/${COMPOSITE}`).then(r => r.ok, () => false);
-    if (!ok) { this.legend.update(phaseLabel, monthLabel, true); }
+    if (!ok) { this.legend.update(phaseLabel, monthLabel, true, metric, mask); }
     return ok;
   }
 
