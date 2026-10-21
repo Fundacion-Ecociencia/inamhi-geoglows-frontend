@@ -160,7 +160,17 @@
             </button>
           </div>
         }
-        <div class="reprod-panel-save"></div>
+        @if (mode === 'pacific') {
+          <div class="reprod-slider d-flex align-items-center">
+            <input type="range" class="form-range" min="0" [max]="sstDates.length - 1" step="1"
+                   [value]="frame" [disabled]="!timeControl || sstDates.length < 2"
+                   (input)="goToFrame($any($event.target).value)"
+                   aria-label="Fecha de la anomalía de TSM" [attr.aria-valuetext]="sstDates[frame]">
+            <span class="reprod-date">{{ sstDates[frame] ?? '' }}</span>
+          </div>
+        } @else {
+          <div class="reprod-panel-save"></div>
+        }
       </div>
     }
 

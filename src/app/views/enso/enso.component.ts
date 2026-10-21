@@ -129,8 +129,10 @@ export class EnsoComponent implements AfterViewInit, OnDestroy {
   /** La animación se pausa al dejar el Pacífico y sigue al volver. */
   private resumePlay = false;
   private pacific!: L.Map;
-  private regions!: L.GeoJSON;
+  private regions!: L.LayerGroup;
   public timeControl?: WMSTimeControl;
+  /** Fechas (AAAA-MM-DD) de los cuadros de la animación, para la etiqueta del deslizador. */
+  public sstDates: string[] = [];
   private geoserver = new Geoserver();
 
   /** Ecuador: caudal esperado */
@@ -324,7 +326,16 @@ export class EnsoComponent implements AfterViewInit, OnDestroy {
     this.sstMessage = '';
     // Una fecha de cada 4 contando desde la más reciente, para que siempre esté la última.
     const dates = all.filter((_, i) => (all.length - 1 - i) % cfg.SST_STEP === 0).slice(-cfg.SST_MAX_FRAMES);
-    const layers = dates.map(d => this.geoserver.getWMSFromImageMosaic(url, cfg.SST_LAYER, d));
+    // Se pide en EPSG:3857, la proyección del mapa. getWMSFromImageMosaic (compartido con las otras apps)
+    // la pide en EPSG:4326: cada tesela llega en grados y Leaflet la estira sobre Mercator, así que dentro de
+    // la tesela la latitud queda corrida. Con zoom 3 una tesela abarca ~40° de latitud y la costa se desplaza
+    // cientos de km (sur del Perú, Centroamérica); con zoom alto casi no se nota. En Ecuador, cerca del
+    // ecuador y con zoom 7, el error de las otras apps es pequeño, por eso no se toca la función compartida.
+    const layers = dates.map(d => L.tileLayer.wms(url, {
+      layers: cfg.SST_LAYER, format: 'image/png', transparent: true, version: '1.1.1',
+      crs: L.CRS.EPSG3857, tileSize: 512, detectRetina: false, time: d,
+    } as L.WMSOptions & { time: string }));
+    this.sstDates = dates.map(d => d.slice(0, 10));
     const titles = dates.map(d => `
       <b>Anomalía de TSM (°C)</b><br>
       <b>Producto:</b> NOAA OISST v2.1<br>
@@ -337,6 +348,23 @@ export class EnsoComponent implements AfterViewInit, OnDestroy {
     this.isPlay ? this.timeControl?.pause() : this.timeControl?.play();
     this.isPlay = !this.isPlay && !!this.timeControl;
   }
+  /** Cuadro visible, para el deslizador. Angular lo relee en cada paso de la animación (setInterval). */
+  public get frame(): number { return this.timeControl?.currentDateIndex ?? 0; }
+
+  /**
+   * Deslizador: salta a un cuadro sin esperar el ciclo. Pausa la animación y usa solo la parte pública de
+   * WMSTimeControl (compartido): oculta todo y avanza desde el cuadro anterior, que es lo que hace next().
+   */
+  public goToFrame(value: number | string): void {
+    const tc = this.timeControl;
+    const i = Number(value);
+    if (!tc || !Number.isInteger(i) || i < 0 || i >= tc.layers.length) { return; }
+    if (this.isPlay) { tc.pause(); this.isPlay = false; }
+    tc.layers.forEach(layer => layer.setOpacity(0));
+    tc.currentDateIndex = i - 1;
+    tc.next();
+  }
+
   public previousFrame(): void { this.timeControl?.previous(); }
   public nextFrame(): void { this.timeControl?.next(); }
   /** Detener: pausa y vuelve al primer cuadro, sin quitar la capa del mapa. */
