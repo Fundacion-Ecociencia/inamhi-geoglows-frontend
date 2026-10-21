@@ -157,6 +157,24 @@
   height: 30px !important;
   font-size: 0.8rem !important;
 }
+/* Deslizador de fechas del Pacífico: salta a un cuadro sin esperar el ciclo de la animación. */
+.reprod-slider{
+  flex: 0 1 320px;
+  min-width: 120px;
+  gap: 10px;
+  margin-left: 16px;
+}
+.reprod-slider .form-range{
+  flex: 1 1 auto;
+  min-width: 60px;
+  accent-color: var(--geo-accent);
+}
+.reprod-date{
+  color: white;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 
 
 /*---------------------------------------------------------------------------*/
@@ -325,6 +343,7 @@
 @container (max-width: 540px) {
   .with-buttons .reprod-title-text{ display: none; }   /* sin título caben los cuatro botones */
   .reprod-panel-save{ display: none; }
+  .reprod-date{ display: none; }     /* en el teléfono queda el deslizador; la fecha está en la leyenda */
 }
 
 @media screen and (max-width: 992px) {

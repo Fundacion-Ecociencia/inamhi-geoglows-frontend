@@ -30,7 +30,7 @@ function logoElement(): HTMLImageElement {
 /*****************************************************************************
  *                        Pacífico tropical (Leaflet)                        *
  *****************************************************************************/
-export function createPacificMap(id: string): { map: L.Map; regions: L.GeoJSON } {
+export function createPacificMap(id: string): { map: L.Map; regions: L.LayerGroup } {
   const light = L.tileLayer(VOYAGER, { zIndex: -1, attribution: CARTO_ATTRIBUTION });
   const dark = L.tileLayer(DARK, { zIndex: -1, attribution: CARTO_ATTRIBUTION });
   // En el teléfono un dedo desplaza la página, no el mapa (igual que la plantilla).
@@ -45,17 +45,24 @@ export function createPacificMap(id: string): { map: L.Map; regions: L.GeoJSON }
   logo.onAdd = () => logoElement();
   logo.addTo(map);
 
-  const features = NINO_REGIONS.map(({ name, bbox: [w, s, e, n] }) => ({
-    type: 'Feature' as const,
-    properties: { name },
-    geometry: { type: 'Polygon' as const, coordinates: [[[w, s], [e, s], [e, n], [w, n], [w, s]]] },
-  }));
-  const regions = L.geoJSON({ type: 'FeatureCollection', features } as any, {
-    style: { color: '#000', weight: 1.5, fill: false, interactive: false },
-    onEachFeature: (f, layer) => layer.bindTooltip(f.properties.name, {
-      permanent: true, direction: 'center', className: 'nino-label',
-    }),
-  }).addTo(map);
+  // Un panel propio por encima de la TSM (overlayPane, z 400) para que los recuadros no queden
+  // debajo de la capa animada, que se agrega después.
+  map.createPane('ninoRegions').style.zIndex = '450';
+  const regions = L.layerGroup();
+  for (const { name, bbox: [w, s, e, n], color, dash, label } of NINO_REGIONS) {
+    L.rectangle([[s, w], [n, e]], {
+      pane: 'ninoRegions', color, weight: dash ? 2.5 : 2, dashArray: dash, fill: false, interactive: false,
+    }).addTo(regions);
+    // La etiqueta va fuera del recuadro, centrada en su lado norte o sur.
+    const lat = label === 'arriba' ? n : s;
+    L.tooltip({
+      permanent: true, direction: label === 'arriba' ? 'top' : 'bottom', offset: [0, label === 'arriba' ? -2 : 2],
+      className: 'nino-label', pane: 'ninoRegions', interactive: false,
+    }).setLatLng([lat, (w + e) / 2])
+      .setContent(`<span style="border-left:4px ${dash ? 'dotted' : 'solid'} ${color};padding-left:4px;color:${color}">${name}</span>`)
+      .addTo(regions);
+  }
+  regions.addTo(map);
 
   setTimeout(() => map.invalidateSize(), 10);
   return { map, regions };

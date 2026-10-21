@@ -65,14 +65,27 @@ export const SST_MAX_FRAMES = 30;
 
 /**
  * Regiones Niño como rectángulos [oeste, sur, este, norte] en grados.
- * Niño 4 va de 160°E a 150°W y cruza el antimeridiano: solo se dibuja la
- * parte de −180 a −150, que es la que cae en el mapa centrado en −125.
+ * Niño 4 va de 160°E a 150°W y cruza el antimeridiano: se dibuja de −200 a −150
+ * (Leaflet sigue la longitud más allá de −180), así se ve completo a la izquierda.
+ *
+ * Niño 3.4 comparte los bordes norte y sur con Niño 3 y Niño 4. Para que se
+ * distingan, cada región tiene su color, Niño 3.4 va punteado y encima (por
+ * los huecos se ve la línea de abajo), y cada etiqueta va fuera del recuadro:
+ * la de Niño 3.4 arriba y las demás abajo. Los colores evitan el rojo y el azul
+ * de la escala de anomalías.
  */
-export const NINO_REGIONS: { name: string; bbox: [number, number, number, number] }[] = [
-  { name: 'Niño 1+2', bbox: [-90, -10, -80, 0] },
-  { name: 'Niño 3', bbox: [-150, -5, -90, 5] },
-  { name: 'Niño 3.4', bbox: [-170, -5, -120, 5] },
-  { name: 'Niño 4', bbox: [-180, -5, -150, 5] },
+export interface NinoRegion {
+  name: string;
+  bbox: [number, number, number, number];
+  color: string;
+  dash?: string;
+  label: 'arriba' | 'abajo';
+}
+export const NINO_REGIONS: NinoRegion[] = [
+  { name: 'Niño 4', bbox: [-200, -5, -150, 5], color: '#8C510A', label: 'abajo' },
+  { name: 'Niño 3', bbox: [-150, -5, -90, 5], color: '#1B7837', label: 'abajo' },
+  { name: 'Niño 1+2', bbox: [-90, -10, -80, 0], color: '#000000', label: 'abajo' },
+  { name: 'Niño 3.4', bbox: [-170, -5, -120, 5], color: '#762A83', dash: '10 7', label: 'arriba' },
 ];
 
 
