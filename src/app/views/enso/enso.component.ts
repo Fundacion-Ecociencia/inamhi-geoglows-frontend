@@ -276,6 +276,18 @@ export class EnsoComponent implements AfterViewInit, OnDestroy {
         card('Pacífico central (RONI)', g, cfg.ONI_LIMITS, o.value != null ? `(ONI ${formatValue(o.value)})` : ''),
         card('Niño 1+2 semanal', w, cfg.ICEN_LIMITS, '', w.date ? `semana del ${w.date.slice(0, 10)}` : ''),
       ];
+      // TSM costera absoluta (no anomalía), media de 7 días, frente al umbral convectivo
+      const t = s.coastal_sst;
+      if (t && t.sst !== null && t.sst !== undefined) {
+        this.statusCards.push({
+          title: 'TSM costera (media 7 d)',
+          value: `${Number(t.sst).toFixed(1).replace('.', ',')} °C`,
+          extra: t.anom !== null && t.anom !== undefined ? `(${formatValue(t.anom)})` : '',
+          label: t.label ?? 'Sin umbral calibrado',
+          date: (t.date ?? '').slice(0, 10) || '—',
+          color: cfg.COASTAL_SST_COLORS[t.level] ?? cfg.PHASE_COLORS.neutral,
+        });
+      }
       this.phase = c.phase_group ?? cfg.phaseGroupFromIcen(c.value);
     } catch (error) {
       console.warn('ENSO:', error);
@@ -371,6 +383,9 @@ export class EnsoComponent implements AfterViewInit, OnDestroy {
 
   /** Cambio de tipo, índice o años en la cabecera de un panel. */
   public onChartChange(i: number): void {
+    // La pluma solo existe para Niño 1+2 y Niño 3.4
+    const c = this.charts[i];
+    if (c.type === 'nmme' && !cfg.NMME_INDICES.some(x => x.value === c.index)) { c.index = 'nino12'; }
     // Espera a que se dibuje la cabecera (el selector de años aparece o desaparece).
     setTimeout(() => this.loadChart(i));
   }
@@ -381,7 +396,7 @@ export class EnsoComponent implements AfterViewInit, OnDestroy {
     const { type, index, years } = this.charts[i];
     const endpoint = cfg.CHART_TYPES.find(t => t.value === type)?.endpoint;
     const params = type === 'series' ? `index=${index}&years=${years}&`
-                 : type === 'heatmap' ? `index=${index}&` : '';
+                 : type === 'heatmap' || type === 'nmme' ? `index=${index}&` : '';
     this.loadPlot(`chart${i}`, `${endpoint}?${params}${this.cellSize(area)}`);
   }
 

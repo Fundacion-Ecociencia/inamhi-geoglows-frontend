@@ -38,6 +38,11 @@ export const PHASE_LABELS: Record<PhaseClass, string> = {
 export const ICEN_LIMITS: [number, number] = [-0.7, 0.5];
 export const ONI_LIMITS: [number, number] = [-0.5, 0.5];
 
+/** Borde de la tarjeta de TSM costera según el nivel respecto al umbral convectivo calibrado. */
+export const COASTAL_SST_COLORS: Record<string, string> = {
+  muy_probable: '#E34A33', probable: '#FDAE6B', bajo: '#9AA0A6',
+};
+
 
 /*---------------------------------------------------------------------------*/
 /*                       Pacífico: anomalía de TSM (WMS)                     */
@@ -202,13 +207,21 @@ export const DEFAULT_MODE: ViewMode = 'pacific';
 /*---------------------------------------------------------------------------*/
 /*                                  Gráficas                                 */
 /*---------------------------------------------------------------------------*/
-export type ChartType = 'series' | 'heatmap' | 'hovmoller';
+export type ChartType = 'series' | 'heatmap' | 'hovmoller' | 'coastal' | 'nmme';
 
 /** Tipos de gráfico de cada panel y su endpoint en /api/enso/. */
 export const CHART_TYPES: (Option<ChartType> & { endpoint: string })[] = [
   { value: 'series', label: 'Serie de un índice', endpoint: 'index-plot' },
   { value: 'heatmap', label: 'Año × mes de un índice', endpoint: 'index-heatmap-plot' },
   { value: 'hovmoller', label: 'Ondas Kelvin (Hovmöller)', endpoint: 'hovmoller-plot' },
+  { value: 'coastal', label: 'TSM costera absoluta y umbral convectivo', endpoint: 'coastal-sst-plot' },
+  { value: 'nmme', label: 'Pronóstico del Niño (NMME)', endpoint: 'nmme-plume-plot' },
+];
+
+/** Índices con pronóstico del NMME (pluma). */
+export const NMME_INDICES: Option[] = [
+  { value: 'nino12', label: 'Niño 1+2 (costa)' },
+  { value: 'nino34', label: 'Niño 3.4 (Pacífico central)' },
 ];
 
 export interface ChartSettings { type: ChartType; index: string; years: number; }
@@ -221,8 +234,8 @@ export interface ChartSettings { type: ChartType; index: string; years: number; 
 export const CHART_DEFAULTS: ChartSettings[] = [
   { type: 'heatmap', index: 'icen', years: 20 },   // oficial completado con el provisional: desde 1950, como el ONI
   { type: 'heatmap', index: 'oni', years: 20 },
-  { type: 'series', index: 'icen_prov', years: 20 },
-  { type: 'hovmoller', index: 'icen_prov', years: 20 },
+  { type: 'coastal', index: 'icen_prov', years: 20 },
+  { type: 'nmme', index: 'nino12', years: 20 },
 ];
 export const PANEL_COUNTS: number[] = [1, 2, 3, 4];
 export const DEFAULT_PANEL_COUNT = 2;
