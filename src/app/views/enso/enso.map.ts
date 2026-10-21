@@ -38,8 +38,11 @@ export function createPacificMap(id: string): { map: L.Map; regions: L.LayerGrou
     center: [-5, -125], zoom: 3, zoomControl: false, dragging: !L.Browser.mobile,
   });
   light.addTo(map);
+  // autoZIndex: false para que los mapas base conserven zIndex −1. Con el valor por defecto el
+  // control les asigna 1 y 2 al cambiar: el oscuro quedaba encima de la TSM (z 1) y el claro, al
+  // volver, empataba con ella y la tapaba por estar después en la página.
   L.control.layers({ 'Mapa claro': light, 'Mapa oscuro': dark }, {},
-                   { position: 'topright' }).addTo(map);
+                   { position: 'topright', autoZIndex: false }).addTo(map);
   L.control.zoom({ position: 'topright' }).addTo(map);
   const logo = new L.Control({ position: 'topleft' });
   logo.onAdd = () => logoElement();
