@@ -136,6 +136,9 @@ export class EnsoComponent implements AfterViewInit, OnDestroy {
   /** Ecuador: caudal esperado */
   public phase = 'neutra';
   public month = new Date().getMonth() + 1;
+  public metric: cfg.CompositeMetric = cfg.DEFAULT_METRIC;
+  /** Atenuar lo no significativo: apagado por defecto, como en los mapas ENSO del IRI. */
+  public maskNonSignificant = false;
   public compositeMissing = false;
   /** Se crea la primera vez que se muestra: MapLibre no se dibuja en un contenedor oculto. */
   private ecuador?: EcuadorMap;
@@ -347,7 +350,7 @@ export class EnsoComponent implements AfterViewInit, OnDestroy {
     const id = this.seq['ecuadorMap'] = (this.seq['ecuadorMap'] ?? 0) + 1;
     const phase = cfg.PHASES.find(p => p.value === this.phase)?.label ?? this.phase;
     const month = cfg.MONTHS.find(m => m.value === this.month)?.label ?? String(this.month);
-    const ok = await this.ecuador.setComposite(this.phase, this.month, phase, month);
+    const ok = await this.ecuador.setComposite(this.phase, this.month, phase, month, this.metric, this.maskNonSignificant);
     if (id === this.seq['ecuadorMap']) { this.compositeMissing = !ok; }
   }
 

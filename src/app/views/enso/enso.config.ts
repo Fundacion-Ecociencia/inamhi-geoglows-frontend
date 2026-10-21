@@ -109,6 +109,58 @@ export const RATIO_CLASSES: { limit: number; color: string; label: string }[] = 
 ];
 export const RATIO_NULL_COLOR = '#555';
 
+/**
+ * Medida del mapa de caudal esperado.
+ * - prob: probabilidad por terciles (Mason y Goddard 2001; mapas ENSO del IRI): fracción de los años de
+ *   la fase con el caudal del mes en el tercio alto o bajo de todos los años. La base es 33 %. No
+ *   explota en ríos casi secos ni la domina un año extremo. Recomendada.
+ * - ratio: caudal medio en la fase / caudal medio de todos los años (la medida original).
+ */
+export type CompositeMetric = 'prob' | 'ratio';
+export const METRICS: Option<CompositeMetric>[] = [
+  { value: 'prob', label: 'Probabilidad por terciles (recomendada)' },
+  { value: 'ratio', label: 'Razón de caudal (medias)' },
+];
+export const DEFAULT_METRIC: CompositeMetric = 'prob';
+
+/** Clases de la probabilidad: el tercio dominante y qué tan seguido ocurrió. */
+export const PROB_STRONG = 0.7;
+export const PROB_WEAK = 0.45;
+export const PROB_CLASSES: { color: string; label: string }[] = [
+  { color: '#b2182b', label: 'Alto, muy probable (≥ 70 %)' },
+  { color: '#f4a582', label: 'Alto, probable (45–70 %)' },
+  { color: '#bdbdbd', label: 'Sin señal clara' },
+  { color: '#92c5de', label: 'Bajo, probable (45–70 %)' },
+  { color: '#2166ac', label: 'Bajo, muy probable (≥ 70 %)' },
+];
+/** Opacidad de lo no significativo cuando se activa la máscara (FDR 10 %, Wilks 2016). */
+export const FADED_OPACITY = 0.3;
+
+/**
+ * Expresión de MapLibre para el color por probabilidad: el tercio dominante (alto o bajo) y su
+ * frecuencia en los años de la fase. Si ninguno llega a PROB_WEAK, o empatan, "sin señal clara".
+ * Sin p_upper (sin muestra o filas sin recalcular), el color de "sin dato".
+ */
+export function probColorExpression(): any {
+  const up = ['to-number', ['get', 'p_upper']];
+  const lo = ['to-number', ['get', 'p_lower']];
+  const [strongUp, weakUp, none, weakLo, strongLo] = PROB_CLASSES.map(c => c.color);
+  return [
+    'case',
+    ['==', ['typeof', ['get', 'p_upper']], 'null'], RATIO_NULL_COLOR,
+    ['all', ['>=', up, PROB_STRONG], ['>', up, lo]], strongUp,
+    ['all', ['>=', lo, PROB_STRONG], ['>', lo, up]], strongLo,
+    ['all', ['>=', up, PROB_WEAK], ['>', up, lo]], weakUp,
+    ['all', ['>=', lo, PROB_WEAK], ['>', lo, up]], weakLo,
+    none,
+  ];
+}
+
+/** Con la máscara, lo no significativo queda tenue (MapLibre lee el booleano de la tesela). */
+export function maskOpacity(mask: boolean): any {
+  return mask ? ['case', ['==', ['get', 'significant'], true], 1, FADED_OPACITY] : 1;
+}
+
 
 /*---------------------------------------------------------------------------*/
 /*                                  Índices                                  */
