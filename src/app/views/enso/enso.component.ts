@@ -310,6 +310,9 @@ export class EnsoComponent implements AfterViewInit, OnDestroy {
   public async updateSst(): Promise<void> {
     this.timeControl?.destroy();
     this.timeControl = undefined;
+    // Sin esto, si la recarga no trae fechas (GetCapabilities falla), el deslizador seguiría mostrando
+    // una fecha de la carga anterior junto al aviso de que la capa no está.
+    this.sstDates = [];
     this.isPlay = false;
     this.resumePlay = false;
     // Si el usuario pide otra ventana antes de que llegue el GetCapabilities, solo la última
