@@ -417,6 +417,8 @@ export class EnsoComponent implements AfterViewInit, OnDestroy {
     // La pluma solo existe para Niño 1+2 y Niño 3.4
     const c = this.charts[i];
     if (c.type === 'nmme' && !cfg.NMME_INDICES.some(x => x.value === c.index)) { c.index = 'nino12'; }
+    // El pronóstico oficial del CPC es del RONI: el selector, deshabilitado, lo muestra
+    if (cfg.CPC_CHARTS.includes(c.type)) { c.index = 'roni'; }
     // Espera a que se dibuje la cabecera (el selector de años aparece o desaparece).
     setTimeout(() => this.loadChart(i));
   }

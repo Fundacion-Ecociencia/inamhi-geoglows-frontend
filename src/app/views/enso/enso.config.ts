@@ -220,7 +220,8 @@ export const DEFAULT_MODE: ViewMode = 'pacific';
 /*---------------------------------------------------------------------------*/
 /*                                  Gráficas                                 */
 /*---------------------------------------------------------------------------*/
-export type ChartType = 'series' | 'heatmap' | 'hovmoller' | 'coastal' | 'nmme';
+export type ChartType = 'series' | 'heatmap' | 'hovmoller' | 'coastal' | 'nmme'
+  | 'cpc_phase' | 'cpc_strength' | 'cpc_roni';
 
 /** Tipos de gráfico de cada panel y su endpoint en /api/enso/. */
 export const CHART_TYPES: (Option<ChartType> & { endpoint: string })[] = [
@@ -229,7 +230,16 @@ export const CHART_TYPES: (Option<ChartType> & { endpoint: string })[] = [
   { value: 'hovmoller', label: 'Ondas Kelvin (Hovmöller)', endpoint: 'hovmoller-plot' },
   { value: 'coastal', label: 'TSM costera absoluta y umbral convectivo', endpoint: 'coastal-sst-plot' },
   { value: 'nmme', label: 'Pronóstico del Niño (NMME)', endpoint: 'nmme-plume-plot' },
+  { value: 'cpc_phase', label: 'Pronóstico oficial NOAA: probabilidad por fase', endpoint: 'cpc-probs-plot' },
+  { value: 'cpc_strength', label: 'Pronóstico oficial NOAA: probabilidad por intensidad', endpoint: 'cpc-strength-plot' },
+  { value: 'cpc_roni', label: 'Pronóstico oficial NOAA: abanico del RONI', endpoint: 'cpc-roni-plot' },
 ];
+
+/**
+ * Pronóstico oficial del CPC (NOAA): es siempre del RONI, así que el selector de índice queda
+ * deshabilitado y mostrando "RONI".
+ */
+export const CPC_CHARTS: ChartType[] = ['cpc_phase', 'cpc_strength', 'cpc_roni'];
 
 /** Índices con pronóstico del NMME (pluma). */
 export const NMME_INDICES: Option[] = [

@@ -194,7 +194,7 @@
                 <div class="chart-field chart-field-index">
                   <mat-form-field class="scaled" appearance="outline" subscriptSizing="dynamic">
                     <mat-label>Índice:</mat-label>
-                    <mat-select [(ngModel)]="chart.index" [disabled]="chart.type === 'hovmoller' || chart.type === 'coastal'" (selectionChange)="onChartChange(i)">
+                    <mat-select [(ngModel)]="chart.index" [disabled]="chart.type === 'hovmoller' || chart.type === 'coastal' || cfg.CPC_CHARTS.includes(chart.type)" (selectionChange)="onChartChange(i)">
                       @for (x of (chart.type === 'nmme' ? cfg.NMME_INDICES : cfg.INDICES); track x.value) {
                         <mat-option class="scaled-text" [value]="x.value">{{ x.label }}</mat-option>
                       }
@@ -316,6 +316,7 @@
       <li><b>Temperatura del mar diaria:</b> NOAA NCEI, OISST v2.1 (anomalía respecto a 1971–2000, la climatología del archivo diario; los índices usan 1991–2020).</li>
       <li><b>ICEN oficial:</b> IGP / ENFEN (Perú). El provisional se calcula con el mismo método sobre OISST.</li>
       <li><b>MEI.v2:</b> NOAA Physical Sciences Laboratory (PSL).</li>
+      <li><b>Pronóstico oficial del ENSO (probabilidades y RONI pronosticado):</b> NOAA CPC, una emisión por mes desde abril de 2026.</li>
       <li><b>Caudales:</b> simulación retrospectiva de GEOGLOWS v2 para los ríos del Ecuador.</li>
     </ul>
     <h3>Actualización</h3>
@@ -350,6 +351,22 @@
       Los modelos aciertan mejor el Pacífico central que la costa: el Niño costero de 2017 casi no se pronosticó, y en
       octubre de 2026 el promedio de los modelos para Niño 1+2 quedó cerca de un grado por debajo de lo observado. El
       pronóstico oficial para el Ecuador y el Perú es el del ENFEN.
+    </p>
+    <h3>Pronóstico oficial de la NOAA (CPC)</h3>
+    <p>
+      El Centro de Predicción Climática de la NOAA publica cada mes, el segundo jueves, su pronóstico oficial del ENSO
+      para las nueve temporadas de tres meses siguientes. Lo decide un equipo de unos diez pronosticadores a partir de
+      varios modelos y de lo observado; no es la salida de un modelo. Hay tres gráficas: la probabilidad de La Niña, neutral
+      y El Niño; la misma probabilidad repartida en rangos de intensidad de 0,5 °C (débil desde 0,5, moderado desde 1,0,
+      fuerte desde 1,5 y muy fuerte desde 2,0 °C); y el abanico del RONI pronosticado, con su mediana y las bandas de
+      los percentiles 25–75, 15–85 y 5–95, junto al RONI observado. Las temporadas van en español por sus iniciales
+      (SON es septiembre–noviembre; DEF, diciembre–febrero) y se ubican en su mes central.
+    </p>
+    <p>
+      Es un pronóstico del RONI, es decir, del Pacífico central (Niño 3.4 relativo al resto del trópico), no del ICEN de
+      la costa: un Niño fuerte en el Pacífico central puede llegar débil a la costa, y al revés, como en 2017. Para la
+      costa del Ecuador y el Perú, el pronóstico oficial es el del ENFEN. Se actualiza solo, el mismo día de la emisión o
+      al siguiente; la nota de cada gráfica dice el mes en que se emitió.
     </p>
     <h3>Caudal esperado: cómo leer el mapa</h3>
     <p>
