@@ -48,6 +48,7 @@ import { Utils } from '../../modules/utils';
 import { WMSTimeControl } from '../../modules/wmsTimeControl';
 import { Geoserver } from '../../modules/geoserver';
 import { FileUploaderComponent } from "../../components/uploader/uploader.component";
+import { MapExporter, GifBuilder, ExportError, downloadBlob, canvasToBlob } from '../../modules/mapExport';
 import { format } from 'maplibre-gl';
 
 
@@ -177,6 +178,10 @@ export class MetDataExplorerComponent {
   // Time control Layers
   public isPlay:boolean = false;
   public timeControl: WMSTimeControl | undefined;
+
+  // Exportación del mapa (imagen y GIF)
+  public isExporting:boolean = false;
+  public exportStatus:string = '';
 
   // Base layers
   public countriesLayer:any;
@@ -1725,11 +1730,124 @@ export class MetDataExplorerComponent {
 
 
 
-  public captureMap(){
-
+  /**
+   * Descarga una imagen PNG del mapa tal como se ve (capas, logo y leyenda), sin los controles de
+   * pantalla, para presentaciones. Al doble de resolución para que la leyenda se lea nítida.
+   */
+  public async captureMap(){
+    if (this.isExporting) return;
+    this.isExporting = true;
+    this.exportStatus = 'Generando imagen...';
+    const exporter = new MapExporter(this.map);
+    try {
+      const canvas = await exporter.render(2);
+      downloadBlob(await canvasToBlob(canvas), this.exportFileName('png'));
+      this.warnMissingImages(exporter);
+    } catch (error) {
+      console.error('Error al generar la imagen del mapa', error);
+      alert('No se pudo generar la imagen del mapa.');
+    } finally {
+      exporter.dispose();
+      this.isExporting = false;
+      this.exportStatus = '';
+    }
   }
-  public captureVideo(){
 
+  /**
+   * Descarga un GIF que repite la animación de la capa activa: un cuadro por fecha, en el mismo
+   * orden que el botón de reproducir. Al terminar deja el mapa en la fecha en que estaba.
+   */
+  public async captureVideo(){
+    if (this.isExporting) return;
+    const tc = this.timeControl;
+    if (!tc || tc.destroyed || tc.layers.length < 2) {
+      alert('Para el GIF hace falta una capa animada con más de una fecha (satélite, pronóstico o GOES).');
+      return;
+    }
+
+    this.isExporting = true;
+    const wasPlaying = this.isPlay;
+    const startIndex = tc.currentDateIndex;
+    tc.pause();
+    this.isPlay = false;
+    const restoreInteraction = this.lockMap();
+    const exporter = new MapExporter(this.map);
+    const gif = new GifBuilder();
+    const total = tc.layers.length;
+    const fileName = this.exportFileName('gif');
+
+    try {
+      for (let i = 0; i < total; i++) {
+        // Si en medio se cargó otra capa (o la actualización automática de GOES rehízo la animación),
+        // los cuadros dejarían de ser de la misma serie.
+        if (this.timeControl !== tc || tc.destroyed) {
+          throw new ExportError('La capa cambió mientras se generaba el GIF. Vuelva a intentarlo.');
+        }
+        this.exportStatus = `Generando GIF: cuadro ${i + 1} de ${total}`;
+        tc.goTo(i);
+        await tc.whenReady(i);
+        const delay = i === total - 1 ? MetDataExplorerComponent.GIF_LAST_FRAME_MS : MetDataExplorerComponent.GIF_FRAME_MS;
+        gif.addFrame(await exporter.render(1), delay);
+      }
+      downloadBlob(gif.finish(), fileName);
+      this.warnMissingImages(exporter);
+    } catch (error) {
+      console.error('Error al generar el GIF', error);
+      alert(error instanceof ExportError ? error.message : 'No se pudo generar el GIF.');
+    } finally {
+      exporter.dispose();
+      restoreInteraction();
+      if (this.timeControl === tc && !tc.destroyed) {
+        tc.goTo(startIndex);
+        if (wasPlaying) {
+          tc.play();
+          this.isPlay = true;
+        }
+      }
+      this.isExporting = false;
+      this.exportStatus = '';
+    }
+  }
+
+  /** Tiempo de cada cuadro del GIF y del último, que se queda un poco más antes de repetir. */
+  private static readonly GIF_FRAME_MS = 500;
+  private static readonly GIF_LAST_FRAME_MS = 1500;
+
+  /**
+   * Bloquea mover y hacer zoom en el mapa mientras se arma el GIF (todos los cuadros deben mostrar la
+   * misma zona). Devuelve la función que deja todo como estaba.
+   */
+  private lockMap(): () => void {
+    const handlers = ['dragging', 'scrollWheelZoom', 'doubleClickZoom', 'boxZoom', 'keyboard', 'touchZoom']
+      .map(name => (this.map as any)[name] as L.Handler | undefined)
+      .filter((handler): handler is L.Handler => !!handler && handler.enabled());
+    handlers.forEach(handler => handler.disable());
+    return () => handlers.forEach(handler => handler.enable());
+  }
+
+  /** Nombre del archivo: capa y fecha si se conocen; si no, "mapa" y la hora local. */
+  private exportFileName(ext: 'png' | 'gif'): string {
+    const tc = this.timeControl;
+    const dates: string[] = this.activeDatesDownload ?? [];
+    const known = tc && !tc.destroyed && this.activeTypeDownload === 'raster' &&
+      this.activeLayerDownload && dates.length === tc.layers.length;
+    let name: string;
+    if (known) {
+      const tag = ext === 'gif' ? `${dates[0]}_${dates[dates.length - 1]}` : `${dates[tc.currentDateIndex]}`;
+      name = `${this.activeLayerDownload}_${tag}`;
+    } else {
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      name = `mapa_${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
+    }
+    return `${name.replace(/[^\w.-]+/g, '-')}.${ext}`;
+  }
+
+  /** Si faltaron teselas, el archivo se descarga igual, pero el usuario debe saberlo antes de usarlo. */
+  private warnMissingImages(exporter: MapExporter){
+    if (exporter.missingImages > 0) {
+      alert(`El archivo se descargó, pero ${exporter.missingImages} partes del mapa no se pudieron leer y quedaron en blanco. Revise la imagen antes de usarla.`);
+    }
   }
 
 
