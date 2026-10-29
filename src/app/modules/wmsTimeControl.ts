@@ -28,6 +28,8 @@ export class WMSTimeControl {
   public layers: L.TileLayer.WMS[];
   public overlays: L.TileLayer.WMS[] | undefined;
   public currentDateIndex: number;
+  /** true después de destroy(): las capas ya no están en el mapa y el control no debe volver a usarse. */
+  public destroyed = false;
   private dateControl: L.Control;
   private dateElement: HTMLElement;
   private interval: any;
@@ -268,6 +270,40 @@ export class WMSTimeControl {
   }
 
   /**
+   * Muestra el paso i y oculta los demás. Lo usa la exportación a GIF para recorrer los pasos en orden.
+   */
+  public goTo(i: number){
+    if (this.destroyed || i < 0 || i >= this.layers.length) return;
+    this.layers.forEach((layer, k) => { if (k !== i) layer.setOpacity(0) });
+    if (this.overlays && this.overlays.length > 0) {
+      this.overlays.forEach((layer, k) => { if (k !== i) layer.setOpacity(0) });
+    }
+    this.currentDateIndex = i;
+    this.ensureAdded(i);
+    this.layers[i].setOpacity(1);
+    this.overlays?.[i]?.setOpacity(1);
+    this.updateLegend();
+  }
+
+  /**
+   * Resuelve cuando la capa del paso i (y su overlay) ya no tiene teselas cargando. A diferencia de
+   * whenLoaded, no espera un evento 'load' si la capa ya estaba cargada. Con un tope de tiempo por si
+   * el servidor no responde: la imagen sale con lo que haya.
+   */
+  public whenReady(i: number, timeoutMs: number = 20000): Promise<void> {
+    const loading = [this.layers[i], this.overlays?.[i]]
+      .filter((layer: any) => layer && typeof layer.isLoading === 'function' && layer.isLoading());
+    if (loading.length === 0) return Promise.resolve();
+    return new Promise(resolve => {
+      let pending = loading.length;
+      const tope = setTimeout(resolve, timeoutMs);
+      loading.forEach((layer: any) => layer.once('load', () => {
+        if (--pending === 0) { clearTimeout(tope); resolve(); }
+      }));
+    });
+  }
+
+  /**
    * Start automatic playback, cycling through frames at fixed interval.
    */
   public play(){
@@ -292,6 +328,7 @@ export class WMSTimeControl {
    * Remove all layers, overlays, and the legend control from the map.
    */
   public destroy(){
+    this.destroyed = true;
     this.pause();
     this.preloadCancelled = true;
     this.pendingPreload = [];
