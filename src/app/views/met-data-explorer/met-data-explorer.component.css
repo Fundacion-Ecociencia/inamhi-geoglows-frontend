@@ -81,7 +81,7 @@
 .anim-menu-box{
   display: flex;
   flex-direction: column;
-  min-width: 220px;
+  min-width: 120px;
   background-color: #162633;
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 0.375rem;
@@ -113,10 +113,6 @@
   font-weight: 500;
 }
 
-.anim-menu-hint{
-  font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.7);
-}
 
 .select{
   width: 300px !important;
