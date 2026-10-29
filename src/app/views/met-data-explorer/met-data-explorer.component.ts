@@ -48,7 +48,7 @@ import { Utils } from '../../modules/utils';
 import { WMSTimeControl } from '../../modules/wmsTimeControl';
 import { Geoserver } from '../../modules/geoserver';
 import { FileUploaderComponent } from "../../components/uploader/uploader.component";
-import { MapExporter, GifBuilder, ExportError, downloadBlob, canvasToBlob } from '../../modules/mapExport';
+import { MapExporter, GifBuilder, Mp4Builder, AnimationBuilder, ExportError, downloadBlob, canvasToBlob } from '../../modules/mapExport';
 import { format } from 'maplibre-gl';
 
 
@@ -179,9 +179,10 @@ export class MetDataExplorerComponent {
   public isPlay:boolean = false;
   public timeControl: WMSTimeControl | undefined;
 
-  // Exportación del mapa (imagen y GIF)
+  // Exportación del mapa (imagen, GIF y video)
   public isExporting:boolean = false;
   public exportStatus:string = '';
+  public isAnimationMenuOpen:boolean = false;
   // Leaflet 1.9 trae disable()/enable() en el control de zoom, pero @types/leaflet no los declara.
   private zoomControl!: L.Control.Zoom & { disable(): unknown; enable(): unknown };
 
@@ -1765,14 +1766,37 @@ export class MetDataExplorerComponent {
   }
 
   /**
-   * Descarga un GIF que repite la animación de la capa activa: un cuadro por fecha, en el mismo
-   * orden que el botón de reproducir. Al terminar deja el mapa en la fecha en que estaba.
+   * Descarga la animación de la capa activa en video MP4: un cuadro por fecha, en el mismo orden que
+   * el botón de reproducir. Es el formato que aceptan Facebook y las presentaciones.
    */
-  public async captureVideo(){
+  public captureVideo(){
+    return this.captureAnimation('mp4');
+  }
+
+  /** Lo mismo que captureVideo(), en un GIF que se repite sin fin. */
+  public captureGif(){
+    return this.captureAnimation('gif');
+  }
+
+  /** Cierra el menú de la animación cuando el foco sale de él (con el teclado o tocando fuera). */
+  public closeAnimationMenuOnBlur(event: FocusEvent, menu: HTMLElement){
+    if (!menu.contains(event.relatedTarget as Node | null)) {
+      this.isAnimationMenuOpen = false;
+    }
+  }
+
+  /**
+   * Arma la animación cuadro a cuadro con el mapa bloqueado y la reproducción en pausa, y al terminar
+   * deja el mapa en la fecha en que estaba. El GIF va a la resolución de la pantalla para que no pese
+   * tanto; el video, a 1080 px de alto o 1920 de ancho como máximo, lo que muestran Facebook y un
+   * proyector.
+   */
+  private async captureAnimation(format: 'gif' | 'mp4'){
     if (this.isExporting) return;
+    const noun = format === 'gif' ? 'GIF' : 'video';
     const tc = this.timeControl;
     if (!tc || tc.destroyed || tc.layers.length < 2) {
-      alert('Para el GIF hace falta una capa animada con más de una fecha (satélite, pronóstico o GOES).');
+      alert(`Para el ${noun} hace falta una capa animada con más de una fecha (satélite, pronóstico o GOES).`);
       return;
     }
 
@@ -1780,32 +1804,39 @@ export class MetDataExplorerComponent {
     const startIndex = tc.currentDateIndex;
     const resumePlayback = this.pausePlayback(tc);
     const restoreInteraction = this.lockMap();
+    const size = this.map.getSize();
+    const scale = format === 'gif' ? 1 : Math.min(2, 1920 / size.x, 1080 / size.y);
     const exporter = new MapExporter(this.map);
-    const gif = new GifBuilder();
+    const builder: AnimationBuilder = format === 'gif' ? new GifBuilder() : new Mp4Builder();
     const total = tc.layers.length;
-    const fileName = this.exportFileName('gif');
+    const fileName = this.exportFileName(format);
 
     try {
+      if (format === 'mp4') {
+        this.exportStatus = 'Preparando video...';
+        await Mp4Builder.assertSupported(size.x * scale, size.y * scale);
+      }
       for (let i = 0; i < total; i++) {
-        this.exportStatus = `Generando GIF: cuadro ${i + 1} de ${total}`;
+        this.exportStatus = `Generando ${noun}: cuadro ${i + 1} de ${total}`;
         tc.goTo(i);
         await tc.whenReady(i);
-        const canvas = await exporter.render(1);
+        const canvas = await exporter.render(scale);
         // Se comprueba después de las esperas de cada cuadro, también del último: si en medio se cargó
         // otra capa (o la actualización automática de GOES rehízo la animación), el cuadro ya no es
         // de la misma serie.
         if (this.timeControl !== tc || tc.destroyed) {
-          throw new ExportError('La capa cambió mientras se generaba el GIF. Vuelva a intentarlo.');
+          throw new ExportError(`La capa cambió mientras se generaba el ${noun}. Vuelva a intentarlo.`);
         }
-        const delay = i === total - 1 ? MetDataExplorerComponent.GIF_LAST_FRAME_MS : MetDataExplorerComponent.GIF_FRAME_MS;
-        gif.addFrame(canvas, delay);
+        const delay = i === total - 1 ? MetDataExplorerComponent.LAST_FRAME_MS : MetDataExplorerComponent.FRAME_MS;
+        await builder.addFrame(canvas, delay);
       }
-      downloadBlob(gif.finish(), fileName);
+      downloadBlob(await builder.finish(), fileName);
       this.warnMissingImages(exporter);
     } catch (error) {
-      console.error('Error al generar el GIF', error);
-      alert(error instanceof ExportError ? error.message : 'No se pudo generar el GIF.');
+      console.error(`Error al generar el ${noun}`, error);
+      alert(error instanceof ExportError ? error.message : `No se pudo generar el ${noun}.`);
     } finally {
+      await builder.dispose();
       exporter.dispose();
       restoreInteraction();
       if (this.timeControl === tc && !tc.destroyed) {
@@ -1817,9 +1848,12 @@ export class MetDataExplorerComponent {
     }
   }
 
-  /** Tiempo de cada cuadro del GIF y del último, que se queda un poco más antes de repetir. */
-  private static readonly GIF_FRAME_MS = 500;
-  private static readonly GIF_LAST_FRAME_MS = 1500;
+  /**
+   * Tiempo de cada cuadro de la animación (GIF y video) y del último, que se queda un poco más para
+   * que se note dónde termina la serie.
+   */
+  private static readonly FRAME_MS = 500;
+  private static readonly LAST_FRAME_MS = 1500;
 
   /**
    * Detiene la reproducción mientras se exporta: el intervalo de 300 ms cambiaría de fecha a mitad
@@ -1839,7 +1873,7 @@ export class MetDataExplorerComponent {
   }
 
   /**
-   * Bloquea el mapa mientras se arma el GIF: todos los cuadros deben mostrar la misma zona, el mismo
+   * Bloquea el mapa mientras se arma la animación: todos los cuadros deben mostrar la misma zona, el mismo
    * mapa base y la leyenda abierta. Desactivar los manejadores de Leaflet no basta, porque los botones
    * +/−, el selector de capas y el de minimizar la leyenda siguen respondiendo; `inert` los apaga para
    * el ratón, el teclado y el tacto, y el control de zoom se pone en gris para que se note.
@@ -1861,14 +1895,14 @@ export class MetDataExplorerComponent {
   }
 
   /** Nombre del archivo: capa y fecha si se conocen; si no, "mapa" y la hora local. */
-  private exportFileName(ext: 'png' | 'gif'): string {
+  private exportFileName(ext: 'png' | 'gif' | 'mp4'): string {
     const tc = this.timeControl;
     const dates: string[] = this.activeDatesDownload ?? [];
     const known = tc && !tc.destroyed && this.activeTypeDownload === 'raster' &&
       this.activeLayerDownload && dates.length === tc.layers.length;
     let name: string;
     if (known) {
-      const tag = ext === 'gif' ? `${dates[0]}_${dates[dates.length - 1]}` : `${dates[tc.currentDateIndex]}`;
+      const tag = ext === 'png' ? `${dates[tc.currentDateIndex]}` : `${dates[0]}_${dates[dates.length - 1]}`;
       name = `${this.activeLayerDownload}_${tag}`;
     } else {
       const now = new Date();

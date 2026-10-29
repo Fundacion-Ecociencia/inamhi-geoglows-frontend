@@ -432,7 +432,7 @@
       </div>
       <div>
         <div class="reprod-panel-button d-flex justify-content-between">
-          <!-- Deshabilitados mientras se arma un GIF: moverse de fecha desordenaría los cuadros. -->
+          <!-- Deshabilitados mientras se arma un GIF o un video: moverse de fecha desordenaría los cuadros. -->
           <button mat-stroked-button class="dark-mode reprod-button" (click)="previousTimeControl()" [disabled]="isExporting">
             <i class="fa-solid fa-backward"></i>
           </button>
@@ -460,10 +460,30 @@
           [disabled]="isExporting" title="Descargar imagen del mapa (PNG)" aria-label="Descargar imagen del mapa (PNG)">
           <i class="fa-solid fa-camera"></i>
         </button>
-        <button mat-stroked-button class="dark-mode reprod-button" (click)="captureVideo()"
-          [disabled]="isExporting" title="Descargar animación (GIF)" aria-label="Descargar animación (GIF)">
-          <i class="fa-solid fa-video"></i>
-        </button>
+        <!-- Menú de la animación: se abre al pasar el ratón y, en pantallas táctiles o con el teclado, al pulsar. -->
+        <div #animMenu class="anim-menu" [class.open]="isAnimationMenuOpen" [class.disabled]="isExporting"
+          (mouseleave)="isAnimationMenuOpen = false" (keydown.escape)="isAnimationMenuOpen = false"
+          (focusout)="closeAnimationMenuOnBlur($event, animMenu)">
+          <button mat-stroked-button class="dark-mode reprod-button" [disabled]="isExporting"
+            (click)="isAnimationMenuOpen = !isAnimationMenuOpen" title="Descargar animación (video o GIF)"
+            aria-label="Descargar animación (video o GIF)" aria-haspopup="menu" [attr.aria-expanded]="isAnimationMenuOpen">
+            <i class="fa-solid fa-video"></i>
+          </button>
+          <div class="anim-menu-options">
+            <div class="anim-menu-box" role="menu">
+              <button type="button" role="menuitem" aria-label="Descargar animación en video (MP4)"
+                (click)="isAnimationMenuOpen = false; captureVideo()">
+                <span class="anim-menu-label"><i class="fa-solid fa-film"></i>&nbsp; Video MP4</span>
+                <span class="anim-menu-hint">Para Facebook y presentaciones</span>
+              </button>
+              <button type="button" role="menuitem" aria-label="Descargar animación en GIF"
+                (click)="isAnimationMenuOpen = false; captureGif()">
+                <span class="anim-menu-label"><i class="fa-regular fa-images"></i>&nbsp; GIF</span>
+                <span class="anim-menu-hint">Se repite solo</span>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>

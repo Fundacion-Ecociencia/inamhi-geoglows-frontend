@@ -20,6 +20,12 @@
 import * as L from 'leaflet';
 import html2canvas from 'html2canvas';
 import { GIFEncoder, quantize, applyPalette, GifStream } from 'gifenc/dist/gifenc.esm.js';
+import type { Output, Mp4OutputFormat, BufferTarget, CanvasSource } from 'mediabunny';
+
+// Mediabunny se descarga la primera vez que alguien pide un video, no con la página (ver mp4Encoding.ts).
+const loadMediabunny = () => import('./mp4Encoding');
+
+const UNSUPPORTED_VIDEO = 'Este navegador no puede generar video MP4. Pruebe con Chrome o Edge actualizados, o descargue el GIF.';
 
 /** Error con un mensaje pensado para mostrárselo al usuario tal cual. */
 export class ExportError extends Error {}
@@ -259,6 +265,97 @@ export class GifBuilder {
     this.gif.finish();
     return new Blob([this.gif.bytes()], { type: 'image/gif' });
   }
+
+  public async dispose(): Promise<void> {}
+}
+
+
+/**
+ * Arma un video MP4 (H.264) con los mismos cuadros que el GIF, para las redes que no aceptan GIF
+ * (Facebook, según los pronosticadores el 29 oct 2026). Codifica con WebCodecs a través de Mediabunny.
+ *
+ * - 30 cuadros por segundo constantes: cada cuadro del mapa se repite durante su tiempo (500 ms son
+ *   15 cuadros). Los repetidos casi no ocupan, y un video de 2 cuadros por segundo lo manejan mal
+ *   algunos editores y plataformas.
+ * - H.264 exige ancho y alto pares: si el mapa mide un número impar, se pierde la última fila o
+ *   columna de píxeles.
+ * - A diferencia del GIF, el video no se repite solo: eso lo decide el reproductor.
+ */
+export class Mp4Builder {
+  public static readonly FPS = 30;
+  private output: Output<Mp4OutputFormat, BufferTarget> | null = null;
+  private source: CanvasSource | null = null;
+  private canvas = document.createElement('canvas');
+  private frames = 0;
+
+  /**
+   * Lanza ExportError si este navegador no puede codificar H.264 a ese tamaño. Se llama antes de
+   * empezar, para no dibujar todos los cuadros y avisar recién al final.
+   */
+  public static async assertSupported(width: number, height: number): Promise<void> {
+    if (typeof VideoEncoder === 'undefined') {
+      throw new ExportError(UNSUPPORTED_VIDEO);
+    }
+    const { canEncodeVideo, QUALITY_HIGH } = await loadMediabunny();
+    const supported = await canEncodeVideo('avc', { width: even(width), height: even(height), quality: QUALITY_HIGH }).catch(() => false);
+    if (!supported) {
+      throw new ExportError(UNSUPPORTED_VIDEO);
+    }
+  }
+
+  /** Agrega un cuadro que dura delayMs. Todos deben medir lo mismo: si el mapa cambió de tamaño, lanza un error. */
+  public async addFrame(frame: HTMLCanvasElement, delayMs: number): Promise<void> {
+    const width = even(frame.width);
+    const height = even(frame.height);
+    if (!this.output) {
+      await this.open(width, height);
+    } else if (width !== this.canvas.width || height !== this.canvas.height) {
+      throw new ExportError('El mapa cambió de tamaño mientras se generaba el video. Vuelva a intentarlo.');
+    }
+    this.canvas.getContext('2d')!.drawImage(frame, 0, 0);
+    const repeats = Math.max(1, Math.round(delayMs * Mp4Builder.FPS / 1000));
+    for (let k = 0; k < repeats; k++) {
+      // Cada cuadro nuevo del mapa empieza con un cuadro clave, para que el reproductor pueda saltar a él.
+      await this.source!.add(this.frames / Mp4Builder.FPS, 1 / Mp4Builder.FPS, k === 0 ? { keyFrame: true } : undefined);
+      this.frames++;
+    }
+  }
+
+  public async finish(): Promise<Blob> {
+    if (!this.output) throw new Error('El video no tiene cuadros.');
+    await this.output.finalize();
+    return new Blob([this.output.target.buffer!], { type: 'video/mp4' });
+  }
+
+  /** Libera el codificador si la exportación se canceló a medias. */
+  public async dispose(): Promise<void> {
+    if (this.output?.state === 'started') {
+      await this.output.cancel().catch(() => {});
+    }
+  }
+
+  private async open(width: number, height: number): Promise<void> {
+    const { Output, Mp4OutputFormat, BufferTarget, CanvasSource, QUALITY_HIGH } = await loadMediabunny();
+    this.canvas.width = width;
+    this.canvas.height = height;
+    // El índice "fast start" va al principio del archivo: Facebook y los navegadores empiezan a
+    // reproducir sin bajarlo entero.
+    this.output = new Output({ format: new Mp4OutputFormat({ fastStart: 'in-memory' }), target: new BufferTarget() });
+    this.source = new CanvasSource(this.canvas, { codec: 'avc', quality: QUALITY_HIGH });
+    this.output.addVideoTrack(this.source, { frameRate: Mp4Builder.FPS });
+    await this.output.start();
+  }
+}
+
+/** Lo que tienen en común GifBuilder y Mp4Builder, para armar la animación igual con los dos. */
+export interface AnimationBuilder {
+  addFrame(canvas: HTMLCanvasElement, delayMs: number): void | Promise<void>;
+  finish(): Blob | Promise<Blob>;
+  dispose(): Promise<void>;
+}
+
+function even(n: number): number {
+  return n - (n % 2);
 }
 
 
