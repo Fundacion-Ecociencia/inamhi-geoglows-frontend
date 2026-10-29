@@ -182,6 +182,8 @@ export class MetDataExplorerComponent {
   // Exportación del mapa (imagen y GIF)
   public isExporting:boolean = false;
   public exportStatus:string = '';
+  // Leaflet 1.9 trae disable()/enable() en el control de zoom, pero @types/leaflet no los declara.
+  private zoomControl!: L.Control.Zoom & { disable(): unknown; enable(): unknown };
 
   // Base layers
   public countriesLayer:any;
@@ -306,7 +308,7 @@ export class MetDataExplorerComponent {
 
     // Add controls
     L.control.layers(baseMaps, {}, { position: 'topright' }).addTo(this.map);
-    L.control.zoom({ position: 'topright' }).addTo(this.map);
+    this.zoomControl = L.control.zoom({ position: 'topright' }).addTo(this.map) as typeof this.zoomControl;
 
     // Add logo control
     const logoControl = new L.Control({ position: 'topleft' });
@@ -1738,16 +1740,25 @@ export class MetDataExplorerComponent {
     if (this.isExporting) return;
     this.isExporting = true;
     this.exportStatus = 'Generando imagen...';
+    const tc = this.timeControl;
+    const wasLive = !!tc && !tc.destroyed;
+    const resumePlayback = this.pausePlayback(tc);
+    const fileName = this.exportFileName('png');
     const exporter = new MapExporter(this.map);
     try {
       const canvas = await exporter.render(2);
-      downloadBlob(await canvasToBlob(canvas), this.exportFileName('png'));
+      // Las teselas se leen antes que la leyenda: si en medio se cargó otra capa, saldrían mezcladas.
+      if (this.timeControl !== tc || (wasLive && tc!.destroyed)) {
+        throw new ExportError('La capa cambió mientras se generaba la imagen. Vuelva a intentarlo.');
+      }
+      downloadBlob(await canvasToBlob(canvas), fileName);
       this.warnMissingImages(exporter);
     } catch (error) {
       console.error('Error al generar la imagen del mapa', error);
-      alert('No se pudo generar la imagen del mapa.');
+      alert(error instanceof ExportError ? error.message : 'No se pudo generar la imagen del mapa.');
     } finally {
       exporter.dispose();
+      resumePlayback();
       this.isExporting = false;
       this.exportStatus = '';
     }
@@ -1766,10 +1777,8 @@ export class MetDataExplorerComponent {
     }
 
     this.isExporting = true;
-    const wasPlaying = this.isPlay;
     const startIndex = tc.currentDateIndex;
-    tc.pause();
-    this.isPlay = false;
+    const resumePlayback = this.pausePlayback(tc);
     const restoreInteraction = this.lockMap();
     const exporter = new MapExporter(this.map);
     const gif = new GifBuilder();
@@ -1778,16 +1787,18 @@ export class MetDataExplorerComponent {
 
     try {
       for (let i = 0; i < total; i++) {
-        // Si en medio se cargó otra capa (o la actualización automática de GOES rehízo la animación),
-        // los cuadros dejarían de ser de la misma serie.
-        if (this.timeControl !== tc || tc.destroyed) {
-          throw new ExportError('La capa cambió mientras se generaba el GIF. Vuelva a intentarlo.');
-        }
         this.exportStatus = `Generando GIF: cuadro ${i + 1} de ${total}`;
         tc.goTo(i);
         await tc.whenReady(i);
+        const canvas = await exporter.render(1);
+        // Se comprueba después de las esperas de cada cuadro, también del último: si en medio se cargó
+        // otra capa (o la actualización automática de GOES rehízo la animación), el cuadro ya no es
+        // de la misma serie.
+        if (this.timeControl !== tc || tc.destroyed) {
+          throw new ExportError('La capa cambió mientras se generaba el GIF. Vuelva a intentarlo.');
+        }
         const delay = i === total - 1 ? MetDataExplorerComponent.GIF_LAST_FRAME_MS : MetDataExplorerComponent.GIF_FRAME_MS;
-        gif.addFrame(await exporter.render(1), delay);
+        gif.addFrame(canvas, delay);
       }
       downloadBlob(gif.finish(), fileName);
       this.warnMissingImages(exporter);
@@ -1799,11 +1810,8 @@ export class MetDataExplorerComponent {
       restoreInteraction();
       if (this.timeControl === tc && !tc.destroyed) {
         tc.goTo(startIndex);
-        if (wasPlaying) {
-          tc.play();
-          this.isPlay = true;
-        }
       }
+      resumePlayback();
       this.isExporting = false;
       this.exportStatus = '';
     }
@@ -1814,15 +1822,42 @@ export class MetDataExplorerComponent {
   private static readonly GIF_LAST_FRAME_MS = 1500;
 
   /**
-   * Bloquea mover y hacer zoom en el mapa mientras se arma el GIF (todos los cuadros deben mostrar la
-   * misma zona). Devuelve la función que deja todo como estaba.
+   * Detiene la reproducción mientras se exporta: el intervalo de 300 ms cambiaría de fecha a mitad
+   * del dibujo y las teselas saldrían de una fecha y la leyenda de otra. Devuelve la función que la
+   * reanuda, solo si estaba en marcha y la capa sigue siendo la misma.
+   */
+  private pausePlayback(tc: WMSTimeControl | undefined): () => void {
+    const wasPlaying = this.isPlay;
+    tc?.pause();
+    this.isPlay = false;
+    return () => {
+      if (wasPlaying && tc && this.timeControl === tc && !tc.destroyed) {
+        tc.play();
+        this.isPlay = true;
+      }
+    };
+  }
+
+  /**
+   * Bloquea el mapa mientras se arma el GIF: todos los cuadros deben mostrar la misma zona, el mismo
+   * mapa base y la leyenda abierta. Desactivar los manejadores de Leaflet no basta, porque los botones
+   * +/−, el selector de capas y el de minimizar la leyenda siguen respondiendo; `inert` los apaga para
+   * el ratón, el teclado y el tacto, y el control de zoom se pone en gris para que se note.
+   * Devuelve la función que deja todo como estaba.
    */
   private lockMap(): () => void {
+    const container = this.map.getContainer();
     const handlers = ['dragging', 'scrollWheelZoom', 'doubleClickZoom', 'boxZoom', 'keyboard', 'touchZoom']
       .map(name => (this.map as any)[name] as L.Handler | undefined)
       .filter((handler): handler is L.Handler => !!handler && handler.enabled());
     handlers.forEach(handler => handler.disable());
-    return () => handlers.forEach(handler => handler.enable());
+    this.zoomControl.disable();
+    container.inert = true;
+    return () => {
+      container.inert = false;
+      this.zoomControl.enable();
+      handlers.forEach(handler => handler.enable());
+    };
   }
 
   /** Nombre del archivo: capa y fecha si se conocen; si no, "mapa" y la hora local. */
