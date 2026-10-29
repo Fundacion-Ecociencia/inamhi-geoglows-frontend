@@ -271,8 +271,8 @@ export class GifBuilder {
 
 
 /**
- * Arma un video MP4 (H.264) con los mismos cuadros que el GIF, para las redes que no aceptan GIF
- * (Facebook, según los pronosticadores el 29 oct 2026). Codifica con WebCodecs a través de Mediabunny.
+ * Arma un video MP4 (H.264) con los mismos cuadros que el GIF, para las redes sociales que no aceptan
+ * GIF. Codifica con WebCodecs a través de Mediabunny.
  *
  * - 30 cuadros por segundo constantes: cada cuadro del mapa se repite durante su tiempo (500 ms son
  *   15 cuadros). Los repetidos casi no ocupan, y un video de 2 cuadros por segundo lo manejan mal
@@ -338,8 +338,8 @@ export class Mp4Builder {
     const { Output, Mp4OutputFormat, BufferTarget, CanvasSource, QUALITY_HIGH } = await loadMediabunny();
     this.canvas.width = width;
     this.canvas.height = height;
-    // El índice "fast start" va al principio del archivo: Facebook y los navegadores empiezan a
-    // reproducir sin bajarlo entero.
+    // El índice "fast start" va al principio del archivo: los reproductores y los navegadores
+    // empiezan a reproducir sin bajarlo entero.
     this.output = new Output({ format: new Mp4OutputFormat({ fastStart: 'in-memory' }), target: new BufferTarget() });
     this.source = new CanvasSource(this.canvas, { codec: 'avc', quality: QUALITY_HIGH });
     this.output.addVideoTrack(this.source, { frameRate: Mp4Builder.FPS });

@@ -1767,7 +1767,7 @@ export class MetDataExplorerComponent {
 
   /**
    * Descarga la animación de la capa activa en video MP4: un cuadro por fecha, en el mismo orden que
-   * el botón de reproducir. Es el formato que aceptan Facebook y las presentaciones.
+   * el botón de reproducir. Es el formato que aceptan las redes sociales y las presentaciones.
    */
   public captureVideo(){
     return this.captureAnimation('mp4');
@@ -1788,8 +1788,8 @@ export class MetDataExplorerComponent {
   /**
    * Arma la animación cuadro a cuadro con el mapa bloqueado y la reproducción en pausa, y al terminar
    * deja el mapa en la fecha en que estaba. El GIF va a la resolución de la pantalla para que no pese
-   * tanto; el video, a 1080 px de alto o 1920 de ancho como máximo, lo que muestran Facebook y un
-   * proyector.
+   * tanto; el video, a 1080 px de alto o 1920 de ancho como máximo, lo que muestran las redes sociales
+   * y un proyector.
    */
   private async captureAnimation(format: 'gif' | 'mp4'){
     if (this.isExporting) return;
