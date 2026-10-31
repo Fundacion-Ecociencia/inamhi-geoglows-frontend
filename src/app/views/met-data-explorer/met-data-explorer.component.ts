@@ -191,6 +191,8 @@ export class MetDataExplorerComponent {
   public isActiveCountriesLayer:boolean = true;
   public provinceLayer: any;
   public isActiveProvinceLayer:boolean = true;
+  public cantonLayer:any;
+  public isActiveCantonLayer:boolean = false;
   public citiesLayer:any;
   public isActiveCitiesLayer:boolean = true;
 
@@ -355,6 +357,16 @@ export class MetDataExplorerComponent {
       zIndex: 999
     });
     this.provinceLayer.addTo(this.map);
+
+    // Límites cantonales (DPA 2025), apagados al abrir. Debajo de las provincias (999), que mandan donde coinciden.
+    // En PNG y no en SVG: con más de 220 cantones, una tesela SVG pesa de 110 a 230 KB y una PNG de 18 a 36 KB.
+    this.cantonLayer = L.tileLayer.wms(`${env.urlGeoserver}/ecuador/wms?`, {
+      layers: 'ecuador:cantones',
+      format: 'image/png',
+      transparent: true,
+      version: '1.1.0',
+      zIndex: 998
+    });
 
     this.citiesLayer = L.tileLayer(
       `https://basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}.png?key=${env.cartoKey}`, {
