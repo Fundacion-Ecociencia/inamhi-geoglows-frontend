@@ -303,12 +303,12 @@
         <label class="form-check-label" for="check-cities">Límites provinciales</label>
       </div>
       <div class="form-check form-switch">
-        <input class="form-check-input" type="checkbox" id="check-cantones" (ngModelChange)="updateOverlayers(isActiveCantonLayer, cantonLayer)"
+        <input class="form-check-input" type="checkbox" id="check-cantones" (ngModelChange)="toggleCantonLayer($event)"
             [(ngModel)]="isActiveCantonLayer">
         <label class="form-check-label" for="check-cantones">Límites cantonales</label>
       </div>
       <div class="form-check form-switch">
-        <input class="form-check-input" type="checkbox" id="check-cities" (ngModelChange)="updateOverlayers(isActiveCitiesLayer, citiesLayer)"
+        <input class="form-check-input" type="checkbox" id="check-cities" (ngModelChange)="toggleCitiesLayer($event)"
             [(ngModel)]="isActiveCitiesLayer">
         <label class="form-check-label" for="check-cities">Ciudades principales</label>
       </div>

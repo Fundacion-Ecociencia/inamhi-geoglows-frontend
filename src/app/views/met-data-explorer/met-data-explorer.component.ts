@@ -52,6 +52,46 @@ import { MapExporter, GifBuilder, Mp4Builder, AnimationBuilder, ExportError, dow
 import { format } from 'maplibre-gl';
 
 
+// Nombres de cantón. Desde este zoom (el mapa abre en 7); los puntos salen de scripts/cantones_etiquetas.py.
+const CANTON_LABEL_MIN_ZOOM = 9;
+const CANTON_LABELS_URL = 'assets/geojson/cantones_etiquetas_2025.geojson';
+// Arial y no Roboto: dentro de una imagen SVG el navegador no usa las fuentes web, y el ancho medido tiene que
+// ser el mismo con que se dibuja.
+const CANTON_LABEL_FONT = { family: 'Arial, Helvetica, sans-serif', size: 10, weight: 600, height: 14 };
+
+async function loadCantonLabels(): Promise<{ marker: L.Marker, latlng: L.LatLng, w: number, h: number }[]> {
+  const res = await fetch(CANTON_LABELS_URL);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  const ctx = document.createElement('canvas').getContext('2d')!;
+  ctx.font = `${CANTON_LABEL_FONT.weight} ${CANTON_LABEL_FONT.size}px ${CANTON_LABEL_FONT.family}`;
+  return data.features.map((f: any) => {
+    const name: string = f.properties.nombre;
+    const [lon, lat] = f.geometry.coordinates;
+    const w = Math.ceil(ctx.measureText(name).width) + 6;
+    const h = CANTON_LABEL_FONT.height;
+    const latlng = L.latLng(lat, lon);
+    const marker = L.marker(latlng, {
+      icon: L.icon({ iconUrl: cantonLabelSvg(name, w, h), iconSize: [w, h], iconAnchor: [w / 2, h / 2], className: 'canton-label' }),
+      pane: 'cantonLabels',
+      interactive: false,
+      keyboard: false,
+    });
+    return { marker, latlng, w, h };
+  });
+}
+
+/** Imagen SVG con el nombre: gris oscuro con halo blanco, para leerse sobre el mapa claro, el oscuro y los ráster. */
+function cantonLabelSvg(name: string, w: number, h: number): string {
+  const text = name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const f = CANTON_LABEL_FONT;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">` +
+    `<text x="${w / 2}" y="${h / 2}" dominant-baseline="central" text-anchor="middle" font-family="${f.family}" ` +
+    `font-size="${f.size}" font-weight="${f.weight}" fill="#333333" stroke="#ffffff" stroke-width="3" ` +
+    `stroke-linejoin="round" paint-order="stroke">${text}</text></svg>`;
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
+
 
 @Component({
   selector: 'app-met-data-explorer',
@@ -193,6 +233,14 @@ export class MetDataExplorerComponent {
   public isActiveProvinceLayer:boolean = true;
   public cantonLayer:any;
   public isActiveCantonLayer:boolean = false;
+  // Nombres de cantón: marcadores con una imagen SVG del texto (así también salen en la captura y el GIF/MP4).
+  private cantonLabelLayer = L.layerGroup();
+  private cantonLabels: { marker: L.Marker, latlng: L.LatLng, w: number, h: number }[] | null = null;
+  private cantonLabelsByZoom = new Map<number, L.Marker[]>();
+  private cantonLabelRequest = 0;
+  // Las ciudades principales se apagan al prender los cantones (sus nombres se montan) y vuelven al apagarlos,
+  // salvo que el usuario las haya tocado en medio.
+  private citiesHiddenByCantons = false;
   public citiesLayer:any;
   public isActiveCitiesLayer:boolean = true;
 
@@ -308,6 +356,12 @@ export class MetDataExplorerComponent {
       zoomControl: false,
     });
     osm.addTo(this.map);
+
+    // Nombres de cantón: encima de teselas y polígonos (400), debajo de los marcadores (600); no reciben clics.
+    const cantonLabelPane = this.map.createPane('cantonLabels');
+    cantonLabelPane.style.zIndex = '450';
+    cantonLabelPane.style.pointerEvents = 'none';
+    this.map.on('zoomend', () => this.updateCantonLabels());
 
     // Add controls
     L.control.layers(baseMaps, {}, { position: 'topright' }).addTo(this.map);
@@ -518,6 +572,73 @@ export class MetDataExplorerComponent {
    */
   public updateOverlayers(isActiveCondition:boolean, layer:any){
     !isActiveCondition ? layer.addTo(this.map) : this.map.removeLayer(layer);
+  }
+
+  /** Interruptor de límites cantonales: capa, nombres según el zoom y ciudades principales. */
+  public toggleCantonLayer(active: boolean): void {
+    this.isActiveCantonLayer = active;
+    if (active) {
+      this.cantonLayer.addTo(this.map);
+      if (this.isActiveCitiesLayer) {
+        this.isActiveCitiesLayer = false;
+        this.map.removeLayer(this.citiesLayer);
+        this.citiesHiddenByCantons = true;
+      }
+    } else {
+      this.map.removeLayer(this.cantonLayer);
+      if (this.citiesHiddenByCantons && !this.isActiveCitiesLayer) {
+        this.isActiveCitiesLayer = true;
+        this.citiesLayer.addTo(this.map);
+      }
+      this.citiesHiddenByCantons = false;
+    }
+    this.updateCantonLabels();
+  }
+
+  /** Interruptor de ciudades principales. Si el usuario lo toca, ya no se restaura solo al apagar los cantones. */
+  public toggleCitiesLayer(active: boolean): void {
+    this.isActiveCitiesLayer = active;
+    this.citiesHiddenByCantons = false;
+    active ? this.citiesLayer.addTo(this.map) : this.map.removeLayer(this.citiesLayer);
+  }
+
+  /** Muestra los nombres de cantón con la capa encendida y desde el zoom CANTON_LABEL_MIN_ZOOM. */
+  private async updateCantonLabels(): Promise<void> {
+    const request = ++this.cantonLabelRequest;
+    const zoom = this.map.getZoom();
+    if (!this.isActiveCantonLayer || zoom < CANTON_LABEL_MIN_ZOOM) {
+      this.map.removeLayer(this.cantonLabelLayer);
+      return;
+    }
+    if (!this.cantonLabels) {
+      try {
+        this.cantonLabels = await loadCantonLabels();
+      } catch (error) {
+        console.warn('No se pudieron cargar los nombres de cantón', error);
+        return;
+      }
+    }
+    if (request !== this.cantonLabelRequest) return;   // mientras cargaba, cambió el zoom o se apagó la capa
+    this.cantonLabelLayer.clearLayers();
+    this.cantonLabelsForZoom(zoom).forEach(marker => this.cantonLabelLayer.addLayer(marker));
+    this.cantonLabelLayer.addTo(this.map);
+  }
+
+  /** Nombres que no se tapan entre sí en ese zoom; los cantones más grandes tienen prioridad. */
+  private cantonLabelsForZoom(zoom: number): L.Marker[] {
+    let markers = this.cantonLabelsByZoom.get(zoom);
+    if (markers) return markers;
+    const placed: L.Bounds[] = [];
+    markers = [];
+    for (const label of this.cantonLabels!) {
+      const p = this.map.project(label.latlng, zoom);
+      const box = L.bounds([p.x - label.w / 2 - 2, p.y - label.h / 2 - 1], [p.x + label.w / 2 + 2, p.y + label.h / 2 + 1]);
+      if (placed.some(other => other.intersects(box))) continue;
+      placed.push(box);
+      markers.push(label.marker);
+    }
+    this.cantonLabelsByZoom.set(zoom, markers);
+    return markers;
   }
 
 
