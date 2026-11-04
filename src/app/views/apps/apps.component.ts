@@ -14,9 +14,8 @@
  *                           LIBRARIES AND MODULES                           *
  *****************************************************************************/
 import { CommonModule } from '@angular/common';
-import { Component, inject } from '@angular/core';
+import { Component } from '@angular/core';
 import { CardappComponent } from '../../components/cardapp/cardapp.component';
-import { AnalyticsService } from '../../services/analytics.service';
 
 
 /*****************************************************************************
@@ -37,14 +36,5 @@ export class AppsComponent {
   public scrolled:boolean = false;
   // ENSO Ecuador se usa por enlace directo (/apps/enso) hasta que se decida mostrarla.
   public showEnsoCard = false;
-  public analytics = inject(AnalyticsService);
-
-  /**
-   * Reopen the Google Analytics consent notice ("PRIVACIDAD" menu item).
-   */
-  public openPrivacy(event: Event): void {
-    event.preventDefault();
-    this.analytics.openSettings();
-  }
 
 }
