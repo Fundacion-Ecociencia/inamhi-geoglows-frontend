@@ -1,0 +1,35 @@
+@if (analytics.showBanner()) {
+  <section class="consent" role="region" aria-label="Aviso de privacidad">
+    <p class="consent-text">
+      Usamos Google Analytics para contar las visitas y saber qué aplicaciones se usan.
+      Solo se activa si lo aceptas.
+      <button type="button" class="consent-link" (click)="details = !details"
+              [attr.aria-expanded]="details" aria-controls="consent-details">
+        {{ details ? 'Menos información' : 'Más información' }}
+      </button>
+    </p>
+
+    @if (details) {
+      <ul id="consent-details" class="consent-details">
+        <li><b>Qué se registra:</b> las páginas que visitas, cuánto tiempo pasas en ellas,
+          el tipo de dispositivo y de navegador, y el país o la ciudad aproximados. No se
+          registran nombres, correos ni tu ubicación exacta.</li>
+        <li><b>Para qué:</b> mejorar la plataforma y saber cuánto se usa. No se usa para
+          publicidad.</li>
+        <li><b>Quién lo procesa:</b> Google, en servidores fuera del Ecuador.</li>
+        <li><b>Si cambias de opinión:</b> entra a «Privacidad», en la página de inicio.</li>
+      </ul>
+    }
+
+    @if (analytics.choice(); as current) {
+      <p class="consent-current">
+        Tu decisión actual: {{ current === 'granted' ? 'aceptado' : 'rechazado' }}.
+      </p>
+    }
+
+    <div class="consent-actions">
+      <button type="button" class="consent-btn" (click)="analytics.reject()">Rechazar</button>
+      <button type="button" class="consent-btn" (click)="analytics.accept()">Aceptar</button>
+    </div>
+  </section>
+}

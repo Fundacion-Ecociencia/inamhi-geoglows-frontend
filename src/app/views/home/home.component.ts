@@ -21,8 +21,9 @@
  *                           LIBRARIES AND MODULES                           *
  *****************************************************************************/
 import { CommonModule } from '@angular/common';
-import { Component, ElementRef, HostListener, ViewChild } from '@angular/core';
+import { Component, ElementRef, HostListener, ViewChild, inject } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
+import { AnalyticsService } from '../../services/analytics.service';
 
 
 
@@ -43,12 +44,21 @@ export class HomeComponent {
    *                             State variables                             *
    ***************************************************************************/
   public scrolled:boolean = false;
+  public analytics = inject(AnalyticsService);
 
 
 
   /***************************************************************************
    *                           Component Functions                           *
    ***************************************************************************/
+  /**
+   * Reopen the Google Analytics consent notice ("PRIVACIDAD" menu item).
+   */
+  public openPrivacy(event: Event): void {
+    event.preventDefault();
+    this.analytics.openSettings();
+  }
+
   /**
    * Window scroll listener that updates `scrolled` on every scroll event.
    */

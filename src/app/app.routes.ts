@@ -8,13 +8,15 @@ import { HydrometReportComponent } from './views/hydromet-report/hydromet-report
 import { EnsoComponent } from './views/enso/enso.component';
 
 
+// El título de cada ruta va a la pestaña del navegador y a los reportes de
+// Google Analytics, que los agrupa por título de página.
 export const routes: Routes = [
-  { path: "", component: HomeComponent },
-  { path: "apps", component: AppsComponent },
-  { path: "apps/hydroviewer", component: HydroviewerComponent },
-  { path: "apps/hydropower", component: HydropowerComponent },
-  { path: "apps/met-data-explorer", component: MetDataExplorerComponent },
-  { path: "apps/hydromet-report-tool", component: HydrometReportComponent },
-  { path: "apps/enso", component: EnsoComponent },
+  { path: "", component: HomeComponent, title: "INAMHI GEOGLOWS" },
+  { path: "apps", component: AppsComponent, title: "Aplicaciones · INAMHI GEOGLOWS" },
+  { path: "apps/hydroviewer", component: HydroviewerComponent, title: "Hydroviewer · INAMHI GEOGLOWS" },
+  { path: "apps/hydropower", component: HydropowerComponent, title: "Hydropower · INAMHI GEOGLOWS" },
+  { path: "apps/met-data-explorer", component: MetDataExplorerComponent, title: "Met Data Explorer · INAMHI GEOGLOWS" },
+  { path: "apps/hydromet-report-tool", component: HydrometReportComponent, title: "Hydromet Report · INAMHI GEOGLOWS" },
+  { path: "apps/enso", component: EnsoComponent, title: "ENSO · INAMHI GEOGLOWS" },
   { path: "**", redirectTo: "", pathMatch: "full" }
 ];
