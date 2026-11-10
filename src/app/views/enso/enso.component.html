@@ -166,7 +166,7 @@
                    [value]="frame" [disabled]="!timeControl || sstDates.length < 2"
                    (input)="goToFrame($any($event.target).value)"
                    aria-label="Fecha de la anomalía de TSM" [attr.aria-valuetext]="sstDates[frame]">
-            <span class="reprod-date">{{ sstDates[frame] ?? '' }}</span>
+            <span class="reprod-date">{{ sstDates[frame] }}</span>
           </div>
         } @else {
           <div class="reprod-panel-save"></div>
