@@ -6,6 +6,11 @@
  * ejemplo con la forma del contrato (docs/plan-enso.md, sección 6) para
  * probar el modal y los gráficos mientras /api/enso/ no está desplegada.
  * Los valores son inventados: no sirven para nada más que ver la vista.
+ *
+ * Perspectiva estacional: con  localStorage.setItem('enso_mock_sin', 'c3s')
+ * (o 'streamflow') ese producto llega null en outlook-status, para ver el
+ * aviso "Aún no hay emisión". Martin no se simula: la capa de caudal costero
+ * muestra el aviso de que no está publicada.
  *****************************************************************************/
 
 /** Tema oscuro del tablero, como lo arma el backend de Hydropower. */
@@ -28,7 +33,146 @@ const phases = ['Cálida moderada o mayor', 'Cálida débil', 'Neutra', 'Fría']
 const phaseColors = ['#b2182b', '#f4a582', '#bdbdbd', '#2166ac'];
 const mes = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
+/*------------------------- Perspectiva estacional -------------------------*/
+const SYSTEMS = [
+  { system: 'multimodelo', label: 'Multimodelo C3S', available: true },
+  { system: 'ecmwf', label: 'ECMWF SEAS5', available: true },
+  { system: 'ukmo', label: 'UKMO GloSea6', available: true },
+  { system: 'meteo_france', label: 'Météo-France S8', available: true },
+  { system: 'dwd', label: 'DWD GCFS2.2', available: true },
+  { system: 'cmcc', label: 'CMCC SPS3.5', available: true },
+  { system: 'ncep', label: 'NCEP CFSv2', available: true },
+  { system: 'jma', label: 'JMA CPS3', available: false },
+  { system: 'eccc', label: 'ECCC CanSIPS', available: true },
+];
+const SEASONS = [
+  { lead: 1, season: 'DEF', months: 'dic–feb' },
+  { lead: 2, season: 'EFM', months: 'ene–mar' },
+  { lead: 3, season: 'FMA', months: 'feb–abr' },
+];
+
+/** Puntos de la malla de 1°: Ecuador continental (−5..1, −81..−75) y Galápagos (−1..1, −92..−89). */
+const CELLS: { lat: number; lon: number }[] = [
+  ...Array.from({ length: 7 * 7 }, (_, i) => ({ lat: -5 + Math.floor(i / 7), lon: -81 + (i % 7) })),
+  ...Array.from({ length: 3 * 4 }, (_, i) => ({ lat: -1 + Math.floor(i / 4), lon: -92 + (i % 4) })),
+];
+
+/** Número fijo entre 0 y 1 a partir de un texto (para que cada sistema dé su propio mapa). */
+function hash01(text: string): number {
+  let h = 2166136261;
+  for (const c of text) { h = Math.imul(h ^ c.charCodeAt(0), 16777619); }
+  return ((h >>> 0) % 1000) / 1000;
+}
+
+/**
+ * Probabilidades de una celda: lluvia sobre lo normal en la costa y Galápagos (Niño costero),
+ * normal en la sierra, algo seca en la Amazonía; temperatura sobre lo normal casi en todo lado.
+ */
+function cellProbs(lat: number, lon: number, variable: string, lead: number, system: string) {
+  const noise = (hash01(`${system}${variable}${lead}${lat}${lon}`) - 0.5) * 0.12;
+  const fade = 1 - 0.15 * (lead - 1);
+  let up: number, lo: number;
+  if (variable === 'temperature') {
+    const coast = lon <= -79 ? 0.3 : 0.12;   // costa y Galápagos
+    up = 0.42 + coast * fade + noise;
+    lo = 0.2 - coast / 3;
+  } else if (lon < -85 || lon <= -80) {
+    up = 0.5 + 0.15 * fade + 2 * noise + 0.04 * lat; lo = 0.15;
+  } else if (lon <= -79) {
+    up = 0.45 + 0.1 * fade + noise; lo = 0.22;
+  } else if (lon >= -77) {
+    up = 0.22; lo = 0.4 + 0.12 * fade + noise;
+  } else {
+    up = 0.3 + noise; lo = 0.28;
+  }
+  up = Math.max(0.05, Math.min(0.9, up)); lo = Math.max(0.05, Math.min(0.9 - up, lo));
+  const no = 1 - up - lo;
+  const [dominant, p_dominant] = ([['upper', up], ['normal', no], ['lower', lo]] as [string, number][])
+    .reduce((a, b) => b[1] > a[1] ? b : a);
+  // Sin habilidad: la sierra central y el sur de la Amazonía en lluvia; poco en temperatura.
+  const rpss = variable === 'temperature' ? 0.15 + noise : lon > -80 && lon < -77 ? -0.05 + noise : lat <= -3 && lon >= -77 ? 0.01 : 0.12 + noise;
+  // Como la API: con el normal dominante no hay ROC y la habilidad depende solo del RPSS.
+  const roc = dominant === 'normal' ? null : variable === 'temperature' ? 0.72 : rpss > 0.05 ? 0.66 : 0.55;
+  const r = (v: number) => +v.toFixed(3);
+  return { p_lower: r(lo), p_normal: r(no), p_upper: r(up), dominant, p_dominant: r(p_dominant),
+           rpss: r(rpss), roc: roc === null ? null : r(roc), skilful: roc === null ? rpss > 0 : roc > 0.6 && rpss > 0 };
+}
+
+function c3sGrid(q: URLSearchParams): any {
+  const system = q.get('system') ?? 'multimodelo', variable = q.get('variable') ?? 'precipitation';
+  const lead = Number(q.get('lead') ?? 1);
+  const season = SEASONS.find(s => s.lead === lead)?.season ?? 'DEF';
+  return {
+    type: 'FeatureCollection', issue_month: '2026-11-01', season,
+    features: CELLS.map(({ lat, lon }) => ({
+      type: 'Feature',
+      geometry: { type: 'Polygon', coordinates: [[[lon - 0.5, lat - 0.5], [lon + 0.5, lat - 0.5],
+        [lon + 0.5, lat + 0.5], [lon - 0.5, lat + 0.5], [lon - 0.5, lat - 0.5]]] },
+      properties: { cell_id: (lat + 90) * 1000 + (lon + 180), lat, lon, ...cellProbs(lat, lon, variable, lead, system) },
+    })),
+  };
+}
+
 const RESPONSES: Record<string, (query: URLSearchParams) => any> = {
+  'outlook-status': () => {
+    const off = (() => { try { return localStorage.getItem('enso_mock_sin') ?? ''; } catch { return ''; } })();
+    return {
+      streamflow: off === 'streamflow' ? null : {
+        issue_month: '2026-11-01', season: 'NDE', months: 'nov–ene',
+        // Octubre de 2026 quedó fuera del rango histórico: los análogos se pesaron con el valor recortado.
+        predictor: { name: 'nino12_oi', label: 'Niño 1+2 (OISST)', month: '2026-10-01', value: 5.25, used: 4.31 },
+        n_reaches: 3303, pct_skilful: 58.0,
+      },
+      c3s: off === 'c3s' ? null : {
+        issue_month: '2026-11-01', systems: SYSTEMS,
+        variables: [{ variable: 'precipitation', label: 'Lluvia' }, { variable: 'temperature', label: 'Temperatura' }],
+        seasons: SEASONS, pct_skilful: { precipitation: 41.0, temperature: 70.0 },
+      },
+      attribution: 'Pronósticos estacionales: Copernicus Climate Change Service (C3S), CC-BY 4.0, doi:10.24381/cds.68dd14c3',
+    };
+  },
+  'c3s-grid': c3sGrid,
+  'c3s-cell-plot': (q) => {
+    const id = Number(q.get('cell_id') ?? 88100);
+    const lat = Math.floor(id / 1000) - 90, lon = (id % 1000) - 180;
+    const variable = q.get('variable') ?? 'precipitation', lead = Number(q.get('lead') ?? 1);
+    const systems = SYSTEMS.filter(s => s.available);
+    const probs = systems.map(s => cellProbs(lat, lon, variable, lead, s.system));
+    const hover = probs.map(p => `RPSS ${p.rpss.toFixed(2)} · ROC ${p.roc === null ? '—' : p.roc.toFixed(2)}`);
+    const bar = (name: string, key: 'p_lower' | 'p_normal' | 'p_upper', color: string) => ({
+      type: 'bar', name, x: systems.map(s => s.label), y: probs.map(p => +(100 * p[key]).toFixed(1)),
+      marker: { color }, customdata: hover, hovertemplate: `%{x}<br>${name}: %{y} %<br>%{customdata}<extra></extra>` });
+    const wet = variable === 'precipitation';
+    const layout: any = { ...dark('Probabilidad (%)', 'Sistema'), barmode: 'group', yaxis: { ...dark('', '').yaxis, title: { text: 'Probabilidad (%)' }, range: [0, 100] } };
+    layout.shapes = [{ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: 33.3, y1: 33.3, line: { color: 'white', width: 1, dash: 'dash' } }];
+    return { cell: { lat, lon }, plot: { layout, data: [
+      bar('Bajo lo normal', 'p_lower', wet ? '#e6550d' : '#2171b5'),
+      bar('Normal', 'p_normal', '#bdbdbd'),
+      bar('Sobre lo normal', 'p_upper', wet ? '#238b45' : '#cb181d'),
+    ] } };
+  },
+  // Figura del contrato: cuatro barras (bajo, normal, sobre lo normal, sobre el P80) con la
+  // climatología como marcadores (33 % por tercil, 20 % sobre el P80).
+  'outlook-plot': () => {
+    const analogs = [{ year: 1998, weight: 0.21, value: 812.3 }, { year: 1983, weight: 0.18, value: 905.1 },
+      { year: 2016, weight: 0.15, value: 455.0 }, { year: 2017, weight: 0.14, value: 610.7 },
+      { year: 1992, weight: 0.12, value: 388.2 }, { year: 2023, weight: 0.11, value: 520.4 },
+      { year: 1987, weight: 0.09, value: null }];
+    const cats = ['Bajo lo normal', 'Normal', 'Sobre lo normal', 'Sobre el P80'];
+    const layout: any = dark('Probabilidad (%)', 'Categoría del caudal medio nov–ene');
+    layout.xaxis.type = 'category';
+    return {
+      river: 'Río Daule', province: 'Guayas', canton: 'Daule', issue_month: '2026-11-01', season: 'NDE',
+      months: 'nov–ene', skilful: true, rpss: 0.18, bss_p80: 0.09, analogs,
+      plot: { layout, data: [
+        { type: 'bar', name: 'Perspectiva', x: cats, y: [12, 25, 63, 41],
+          marker: { color: ['#2166ac', '#bdbdbd', '#b2182b', '#67000d'] } },
+        { type: 'scatter', mode: 'markers', name: 'Climatología', x: cats, y: [33.3, 33.3, 33.3, 20],
+          marker: { color: 'white', symbol: 'line-ew-open', size: 30, line: { width: 3, color: 'white' } } },
+      ] },
+    };
+  },
+
   'status': () => ({
     coastal: { index: 'icen_prov', value: 1.12, date: '2026-09-01', phase: 'calida_moderada', label: 'Cálida moderada', phase_group: 'calida_debil' },
     global: { index: 'roni', value: 1.69, date: '2026-09-01', phase: 'el_nino', label: 'El Niño' },
@@ -112,6 +256,10 @@ const RESPONSES: Record<string, (query: URLSearchParams) => any> = {
 export async function mockFetch(url: string): Promise<Response> {
   await new Promise(r => setTimeout(r, 400));
   const endpoint = new URL(url).pathname.split('/').pop() ?? '';
+  if (endpoint === 'outlook-csv') {
+    return new Response('issue_month,comid,season,p_lower,p_normal,p_upper,p_p80,rpss,skilful\n2026-11-01,9035711,NDE,0.12,0.25,0.63,0.41,0.18,true\n',
+      { status: 200, headers: { 'Content-Type': 'text/csv' } });
+  }
   if (endpoint === 'composite-csv') {
     return new Response('comid,month,phase,q_mean,ratio,n_years\n9035711,1,calida_fuerte,812.4,1.62,4\n',
       { status: 200, headers: { 'Content-Type': 'text/csv' } });

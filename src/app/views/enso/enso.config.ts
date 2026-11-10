@@ -159,17 +159,21 @@ export const FADED_OPACITY = 0.3;
  * frecuencia en los años de la fase. Si ninguno llega a PROB_WEAK, o empatan, "sin señal clara".
  * Sin p_upper (sin muestra o filas sin recalcular), el color de "sin dato".
  */
-export function probColorExpression(): any {
+export function probColorExpression(withNormal = false): any {
   const up = ['to-number', ['get', 'p_upper']];
   const lo = ['to-number', ['get', 'p_lower']];
+  // Con `withNormal` (perspectiva de caudal) el tercil alto o bajo además tiene que superar al
+  // normal para pintarse; si gana el normal, queda en el color de "sin señal clara".
+  const no = ['to-number', ['coalesce', ['get', 'p_normal'], 0]];
+  const beats = (a: any, b: any) => withNormal ? ['all', ['>', a, b], ['>', a, no]] : ['>', a, b];
   const [strongUp, weakUp, none, weakLo, strongLo] = PROB_CLASSES.map(c => c.color);
   return [
     'case',
     ['==', ['typeof', ['get', 'p_upper']], 'null'], RATIO_NULL_COLOR,
-    ['all', ['>=', up, PROB_STRONG], ['>', up, lo]], strongUp,
-    ['all', ['>=', lo, PROB_STRONG], ['>', lo, up]], strongLo,
-    ['all', ['>=', up, PROB_WEAK], ['>', up, lo]], weakUp,
-    ['all', ['>=', lo, PROB_WEAK], ['>', lo, up]], weakLo,
+    ['all', ['>=', up, PROB_STRONG], beats(up, lo)], strongUp,
+    ['all', ['>=', lo, PROB_STRONG], beats(lo, up)], strongLo,
+    ['all', ['>=', up, PROB_WEAK], beats(up, lo)], weakUp,
+    ['all', ['>=', lo, PROB_WEAK], beats(lo, up)], weakLo,
     none,
   ];
 }
@@ -177,6 +181,104 @@ export function probColorExpression(): any {
 /** Con la máscara, lo no significativo queda tenue (MapLibre lee el booleano de la tesela). */
 export function maskOpacity(mask: boolean): any {
   return mask ? ['case', ['==', ['get', 'significant'], true], 1, FADED_OPACITY] : 1;
+}
+
+
+/*---------------------------------------------------------------------------*/
+/*                Perspectiva estacional (C3S y caudal costero)              */
+/*---------------------------------------------------------------------------*/
+/**
+ * Capas de la perspectiva: lluvia y temperatura del multimodelo C3S (malla de 1°, GeoJSON de la
+ * API) y caudal de los tramos costeros (Martin, `mvt_enso_outlook`).
+ */
+export type OutlookLayer = 'precipitation' | 'temperature' | 'streamflow';
+export const OUTLOOK_LAYERS: Option<OutlookLayer>[] = [
+  { value: 'precipitation', label: 'Lluvia (C3S)' },
+  { value: 'temperature', label: 'Temperatura (C3S)' },
+  { value: 'streamflow', label: 'Caudal (costa)' },
+];
+export const OUTLOOK_DEFAULT_SYSTEM = 'multimodelo';
+
+/** Cortes de la probabilidad del tercil dominante en la malla C3S (40–50, 50–60, 60–70, ≥ 70 %). */
+export const C3S_LIMITS = [0.4, 0.5, 0.6, 0.7];
+export const C3S_LIMIT_LABELS = ['40–50 %', '50–60 %', '60–70 %', '≥ 70 %'];
+
+/**
+ * Colores por tercil dominante, de menos a más probable. Lluvia: bajo lo normal en cafés y
+ * naranjas, sobre lo normal en verdes y azul (convención de los centros de la OMM). Temperatura:
+ * bajo lo normal en azules, sobre lo normal en rojos.
+ */
+export const C3S_COLORS: Record<'precipitation' | 'temperature', { lower: string[]; upper: string[] }> = {
+  precipitation: {
+    lower: ['#fdd49e', '#fdae6b', '#e6550d', '#8c2d04'],
+    upper: ['#c7e9c0', '#74c476', '#238b45', '#08519c'],
+  },
+  temperature: {
+    lower: ['#c6dbef', '#6baed6', '#2171b5', '#08306b'],
+    upper: ['#fcbba1', '#fb6a4a', '#cb181d', '#67000d'],
+  },
+};
+/** Tercil normal dominante (≥ 40 %), dominante bajo 40 % y celdas sin habilidad comprobada. */
+export const C3S_NORMAL_COLOR = '#e3dcb4';
+export const C3S_NO_SIGNAL_COLOR = '#f7f7f7';
+export const NO_SKILL_COLOR = '#8c8c8c';
+/** Opacidad del relleno de las celdas: con habilidad y sin ella (gris tenue). */
+export const C3S_OPACITY = 0.75;
+export const C3S_NO_SKILL_OPACITY = 0.3;
+
+/**
+ * Color de una celda C3S: gris si no tiene habilidad comprobada (regla del contrato: ROC del
+ * tercil dominante > 0,6 y RPSS > 0, ya calculada por la API en `skilful`); si no, el tercil
+ * dominante con la intensidad de su probabilidad.
+ */
+export function c3sColorExpression(variable: 'precipitation' | 'temperature'): any {
+  const { lower, upper } = C3S_COLORS[variable];
+  const pd = ['to-number', ['get', 'p_dominant']];
+  const steps = (colors: string[]) => ['step', pd, C3S_NO_SIGNAL_COLOR,
+    ...C3S_LIMITS.flatMap((limit, i) => [limit, colors[i]])];
+  return [
+    'case',
+    ['==', ['typeof', ['get', 'p_dominant']], 'null'], NO_SKILL_COLOR,
+    ['!=', ['get', 'skilful'], true], NO_SKILL_COLOR,
+    ['<', pd, C3S_LIMITS[0]], C3S_NO_SIGNAL_COLOR,
+    ['==', ['get', 'dominant'], 'lower'], steps(lower),
+    ['==', ['get', 'dominant'], 'upper'], steps(upper),
+    C3S_NORMAL_COLOR,
+  ];
+}
+
+export function c3sOpacityExpression(): any {
+  return ['case', ['==', ['get', 'skilful'], true], C3S_OPACITY, C3S_NO_SKILL_OPACITY];
+}
+
+/**
+ * Caudal costero: mismos colores y cortes que la probabilidad del caudal esperado (PROB_CLASSES),
+ * con el dominante elegido entre los tres terciles. Gris si no tiene habilidad comprobada
+ * (RPSS ≤ 0,05) y gris oscuro tenue en los tramos fuera de la costa (todo nulo).
+ */
+export function outlookColorExpression(): any {
+  return [
+    'case',
+    ['==', ['typeof', ['get', 'p_upper']], 'null'], RATIO_NULL_COLOR,
+    ['!=', ['get', 'skilful'], true], NO_SKILL_COLOR,
+    probColorExpression(true),
+  ];
+}
+
+export function outlookOpacityExpression(): any {
+  return [
+    'case',
+    ['==', ['typeof', ['get', 'p_upper']], 'null'], 0.15,
+    ['!=', ['get', 'skilful'], true], 0.6,
+    1,
+  ];
+}
+
+const MONTH_SHORT = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+/** '2026-11-01' → 'nov 2026'. */
+export function monthYear(iso: string | null | undefined): string {
+  const m = /^(\d{4})-(\d{2})/.exec(iso ?? '');
+  return m ? `${MONTH_SHORT[Number(m[2]) - 1]} ${m[1]}` : '—';
 }
 
 
@@ -205,13 +307,14 @@ export const INDEX_YEARS: number[] = [10, 20, 40, 80];
 /*---------------------------------------------------------------------------*/
 /*                          Vistas del área principal                        */
 /*---------------------------------------------------------------------------*/
-export type ViewMode = 'pacific' | 'ecuador' | 'charts';
+export type ViewMode = 'pacific' | 'ecuador' | 'charts' | 'outlook';
 
 /** Botones de la barra superior. `short` es el texto cuando no cabe el largo (móvil). */
 export const VIEW_MODES: { value: ViewMode; label: string; short: string; icon: string }[] = [
   { value: 'pacific', label: 'Pacífico: anomalía de TSM', short: 'Pacífico', icon: 'fa-solid fa-water' },
   { value: 'ecuador', label: 'Ecuador: caudal esperado', short: 'Ecuador', icon: 'fa-solid fa-arrow-trend-up' },
   { value: 'charts', label: 'Gráficas', short: 'Gráficas', icon: 'fa-solid fa-chart-column' },
+  { value: 'outlook', label: 'Perspectiva estacional', short: 'Perspectiva', icon: 'fa-solid fa-cloud-sun-rain' },
 ];
 /** El Pacífico se crea al abrir la vista; Ecuador, la primera vez que se muestra. */
 export const DEFAULT_MODE: ViewMode = 'pacific';

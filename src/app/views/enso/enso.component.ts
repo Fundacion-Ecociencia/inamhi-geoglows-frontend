@@ -7,6 +7,8 @@
  *   - Pacífico: anomalía de TSM (WMS animado) con las regiones Niño.
  *   - Ecuador: caudal esperado por río según la fase (Martin); clic → modal.
  *   - Gráficas: de 1 a 4 paneles, cada uno con su tipo e índice.
+ *   - Perspectiva: terciles de lluvia y temperatura del C3S (malla de 1°) o del
+ *     caudal de la costa (Martin), sobre el mismo mapa de Ecuador; clic → modal.
  * Contrato de la API: docs/plan-enso.md, sección 6.
  *
  * - enso.config.ts: listas de los selectores, colores y umbrales.
@@ -31,11 +33,26 @@ import { LoadingComponent } from '../../components/loading/loading.component';
 import { Geoserver } from '../../modules/geoserver';
 import { WMSTimeControl } from '../../modules/wmsTimeControl';
 import * as cfg from './enso.config';
-import { createPacificMap, EcuadorMap } from './enso.map';
+import { createPacificMap, EcuadorMap, EcuadorView, OutlookLegend } from './enso.map';
 import { mockFetch } from './enso.mock';
 
 interface PlotCell { state: 'loading' | 'ready' | 'empty'; plot?: any; }
 interface StatusCard { title: string; value: string; extra: string; label: string; date: string; color: string; }
+/** Qué muestra el modal de datos: un río (caudal esperado o perspectiva) o una celda C3S. */
+type ModalKind = 'composite' | 'outlook' | 'cell';
+
+/** "2° S" / "80° O": coordenada del centro de una celda de 1°. */
+function formatCoord(v: any, negative: string, positive: string): string {
+  const n = Number(v);
+  if (v === null || v === undefined || isNaN(n)) { return '—'; }
+  return `${String(Math.abs(n)).replace('.', ',')}° ${n < 0 ? negative : positive}`;
+}
+
+/** "21 %" a partir de 0,21. */
+function formatPct(v: any): string {
+  const n = Number(v);
+  return v === null || v === undefined || isNaN(n) ? '—' : `${Math.round(n * 100)} %`;
+}
 
 /** "+1,12 °C" o "−0,85 °C": signo explícito (menos tipográfico) y coma decimal. */
 function formatValue(v: any): string {
@@ -145,6 +162,17 @@ export class EnsoComponent implements AfterViewInit, OnDestroy {
   /** Se crea la primera vez que se muestra: MapLibre no se dibuja en un contenedor oculto. */
   private ecuador?: EcuadorMap;
 
+  /** Perspectiva estacional: lo elegido en el panel y lo que está aplicado en el mapa. */
+  public outlookStatus: any = null;
+  public outlookStatusFailed = false;
+  public outlookLayer: cfg.OutlookLayer = 'precipitation';
+  public outlookSystem = cfg.OUTLOOK_DEFAULT_SYSTEM;
+  public outlookLead = 1;
+  /** Lo aplicado con "Actualizar" (los selectores pueden cambiar sin aplicarse); null si nunca. */
+  private outlookApplied: { layer: cfg.OutlookLayer; system: string; lead: number } | null = null;
+  /** Aviso sobre el mapa en la vista Perspectiva (sin emisión, sin capa en Martin, petición fallida). */
+  public outlookMessage = '';
+
   /** Gráficas: los 4 paneles existen siempre; se muestran los primeros `panelCount`. */
   public panelCount = cfg.DEFAULT_PANEL_COUNT;
   public panelCountChoice = cfg.DEFAULT_PANEL_COUNT;
@@ -160,11 +188,18 @@ export class EnsoComponent implements AfterViewInit, OnDestroy {
   public cells: Record<string, PlotCell> = {
     chart0: { state: 'loading' }, chart1: { state: 'loading' }, chart2: { state: 'loading' }, chart3: { state: 'loading' },
     composite: { state: 'loading' }, analogs: { state: 'loading' }, icen: { state: 'loading' },
+    outlook: { state: 'loading' }, c3sCell: { state: 'loading' },
   };
   private seq: Record<string, number> = {};
   public river = { comid: '', river: '', province: '', canton: '' };
   public analogYears: number[] = [];
   public csvError = false;
+  public modalKind: ModalKind = 'composite';
+  /** Perspectiva de un río: temporada, habilidad y años análogos (de `outlook-plot`). */
+  public outlookRiver: { issue: string; season: string; skilful: boolean | null; rpss: string; bssP80: string;
+                         analogs: { year: number; weight: string; value: string }[] } | null = null;
+  /** Celda C3S del modal. */
+  public c3sCell = { cellId: '', title: '', variable: '', season: '', source: '' };
 
   /** Modo de prueba sin API (ver enso.mock.ts). */
   private readonly mock = (() => {
@@ -176,6 +211,7 @@ export class EnsoComponent implements AfterViewInit, OnDestroy {
     ({ map: this.pacific, regions: this.regions } = createPacificMap('map-pacific'));
     // La fase del ICEN actual es la fase por defecto del mapa de Ecuador, si ya se creó.
     this.loadStatus().then(() => this.updateComposite());
+    this.loadOutlookStatus();
     this.updateSst();
   }
 
@@ -246,11 +282,25 @@ export class EnsoComponent implements AfterViewInit, OnDestroy {
     if (this.mode === 'pacific') {
       this.pacific.invalidateSize();
       if (this.resumePlay) { this.timeControl?.play(); this.resumePlay = false; }
-    } else if (this.mode === 'ecuador') {
-      if (this.ecuador) { this.ecuador.resize(); return; }
-      this.ecuador = new EcuadorMap('map-ecuador', L.Browser.mobile, p => this.openRiver(p));
-      if (!this.showProvinces) { this.ecuador.setProvinces(false); }
-      this.updateComposite();
+    } else if (this.mode === 'ecuador' || this.mode === 'outlook') {
+      // Un solo mapa de Ecuador para las dos vistas: cambia qué capas se ven, no el mapa.
+      if (!this.ecuador) {
+        this.ecuador = new EcuadorMap('map-ecuador', L.Browser.mobile,
+          (p, view) => view === 'streamflow' ? this.openOutlookRiver(p) : this.openRiver(p),
+          p => this.openCell(p));
+        if (!this.showProvinces) { this.ecuador.setProvinces(false); }
+        this.updateComposite();
+      } else {
+        this.ecuador.resize();
+      }
+      if (this.mode === 'ecuador') {
+        this.ecuador.setView('composite');
+      } else if (this.outlookApplied) {
+        this.ecuador.setView(this.outlookView(this.outlookApplied.layer));
+      } else {
+        this.ecuador.setView(this.outlookView(this.outlookLayer));
+        this.updateOutlook();
+      }
     } else if (this.chartsStale) {
       this.chartsStale = false;
       this.charts.slice(0, this.panelCount).forEach((_, i) => this.loadChart(i));
@@ -399,6 +449,203 @@ export class EnsoComponent implements AfterViewInit, OnDestroy {
 
 
   /*************************************************************************
+   *                Perspectiva estacional (C3S y caudal costero)          *
+   *************************************************************************/
+  private async loadOutlookStatus(): Promise<void> {
+    try {
+      const s = await this.getJSON('outlook-status');
+      this.outlookStatus = s;
+      // Por defecto, la primera capa con emisión y el multimodelo (o el primer sistema disponible).
+      if (!s.c3s && s.streamflow) { this.outlookLayer = 'streamflow'; }
+      const systems: any[] = s.c3s?.systems ?? [];
+      if (!systems.some(x => x.system === this.outlookSystem && x.available)) {
+        this.outlookSystem = systems.find(x => x.available)?.system ?? this.outlookSystem;
+      }
+      const leads: any[] = s.c3s?.seasons ?? [];
+      if (leads.length && !leads.some(x => x.lead === this.outlookLead)) { this.outlookLead = leads[0].lead; }
+    } catch (error) {
+      console.warn('ENSO:', error);
+      this.outlookStatusFailed = true;
+    }
+    // Si la vista ya se abrió mientras llegaba el estado, se pinta ahora.
+    if (this.mode === 'outlook' && this.ecuador) { this.updateOutlook(); }
+  }
+
+  /** Producto (C3S o caudal) de la capa elegida en el panel; null si aún no tiene emisión. */
+  public outlookProduct(layer: cfg.OutlookLayer = this.outlookLayer): any {
+    return layer === 'streamflow' ? this.outlookStatus?.streamflow : this.outlookStatus?.c3s;
+  }
+
+  private outlookView(layer: cfg.OutlookLayer): EcuadorView { return layer === 'streamflow' ? 'streamflow' : 'c3s'; }
+
+  /**
+   * "Niño 1+2 (OISST) de oct 2026: +2,85 °C". Si el valor observado sale del rango histórico de
+   * ese mes, la API manda en `used` el valor recortado con el que se pesaron los años análogos.
+   */
+  public get outlookPredictor(): string {
+    const p = this.outlookStatus?.streamflow?.predictor;
+    if (!p) { return ''; }
+    const used = p.used !== null && p.used !== undefined && !isNaN(Number(p.used))
+      ? ` (fuera del rango histórico; se pesó con ${formatValue(p.used)})` : '';
+    return `${p.label ?? p.name} de ${cfg.monthYear(p.month)}: ${formatValue(p.value)}${used}`;
+  }
+
+  public seasonLabel(s: any): string { return s ? `${s.season} (${s.months})` : '—'; }
+
+  /** "Actualizar" del panel: muestra la perspectiva (si el mapa se crea ahí, la creación ya la pinta). */
+  public applyOutlook(): void {
+    const created = !!this.ecuador;
+    this.setMode('outlook');
+    if (created) { this.updateOutlook(); }
+  }
+
+  public async updateOutlook(): Promise<void> {
+    // Sin el estado aún: loadOutlookStatus llama de nuevo al terminar.
+    if (!this.ecuador || (!this.outlookStatus && !this.outlookStatusFailed)) { return; }
+    const applied = this.outlookApplied = { layer: this.outlookLayer, system: this.outlookSystem, lead: this.outlookLead };
+    const id = this.seq['outlook'] = (this.seq['outlook'] ?? 0) + 1;
+    this.ecuador.setView(this.outlookView(applied.layer));
+    this.outlookMessage = '';
+    const product = this.outlookProduct(applied.layer);
+    const sinEmision = 'Aún no hay emisión de esta perspectiva';
+
+    if (applied.layer === 'streamflow') {
+      const legend = this.streamflowLegend(product);
+      if (!product) {
+        this.outlookMessage = this.outlookStatusFailed ? 'La perspectiva estacional aún no está publicada' : sinEmision;
+        return;
+      }
+      const ok = await this.ecuador.setStreamflowOutlook(product.issue_month, legend,
+        'La capa de perspectiva de caudal aún no está publicada.');
+      if (id === this.seq['outlook'] && !ok) {
+        this.outlookMessage = 'La capa de perspectiva de caudal aún no está publicada en Martin';
+      }
+      return;
+    }
+
+    const variable = applied.layer;
+    if (!product) {
+      this.outlookMessage = this.outlookStatusFailed ? 'La perspectiva estacional aún no está publicada' : sinEmision;
+      await this.ecuador.setC3sGrid(null, variable, { ...this.c3sLegend(null, variable), missing: `${this.outlookMessage}.` });
+      return;
+    }
+    try {
+      const grid = await this.getJSON(`c3s-grid?system=${encodeURIComponent(applied.system)}` +
+        `&variable=${variable}&lead=${applied.lead}`);
+      if (id !== this.seq['outlook']) { return; }
+      await this.ecuador.setC3sGrid(grid, variable, this.c3sLegend(grid, variable));
+    } catch (error) {
+      console.warn('ENSO:', error);
+      if (id !== this.seq['outlook']) { return; }
+      this.outlookMessage = 'No hay pronóstico C3S para esta selección';
+      await this.ecuador.setC3sGrid(null, variable, { ...this.c3sLegend(null, variable), missing: `${this.outlookMessage}.` });
+    }
+  }
+
+  private systemLabel(system: string): string {
+    return this.outlookStatus?.c3s?.systems?.find((x: any) => x.system === system)?.label ?? system;
+  }
+
+  private c3sLegend(grid: any, variable: 'precipitation' | 'temperature'): OutlookLegend {
+    const c3s = this.outlookStatus?.c3s;
+    const { system, lead } = this.outlookApplied ?? { system: this.outlookSystem, lead: this.outlookLead };
+    const season = c3s?.seasons?.find((x: any) => x.lead === lead);
+    const { lower, upper } = cfg.C3S_COLORS[variable];
+    const name = variable === 'precipitation' ? 'Lluvia' : 'Temperatura';
+    return {
+      title: `${name}: probabilidad del tercil dominante`,
+      lines: [
+        `<b>Temporada:</b> ${this.seasonLabel(season ?? (grid?.season ? { season: grid.season, months: '' } : null))}`,
+        `<b>Fuente:</b> C3S · ${this.systemLabel(system)} · emisión ${cfg.monthYear(grid?.issue_month ?? c3s?.issue_month)}`,
+      ],
+      columns: {
+        headers: ['Bajo', 'Sobre'],
+        rows: cfg.C3S_LIMIT_LABELS.map((label, i) => [label, lower[i], upper[i]] as [string, string, string]),
+      },
+      classes: [
+        { color: cfg.C3S_NORMAL_COLOR, label: 'Normal (≥ 40 %)', opacity: cfg.C3S_OPACITY },
+        { color: cfg.C3S_NO_SIGNAL_COLOR, label: 'Sin señal clara (< 40 %)', opacity: cfg.C3S_OPACITY },
+        { color: cfg.NO_SKILL_COLOR, label: 'Sin habilidad comprobada', opacity: cfg.C3S_NO_SKILL_OPACITY + 0.2 },
+      ],
+      shape: 'fill',
+      note: 'Base: 33 % por tercil',
+    };
+  }
+
+  private streamflowLegend(product: any): OutlookLegend {
+    const [strongUp, weakUp, , weakLo, strongLo] = cfg.PROB_CLASSES;
+    return {
+      title: 'Caudal: probabilidad del tercil dominante',
+      lines: [
+        `<b>Temporada:</b> ${this.seasonLabel(product)}`,
+        `<b>Fuente:</b> GEOGLOWS · análogos de ${product?.predictor?.label ?? 'Niño 1+2'} · emisión ${cfg.monthYear(product?.issue_month)}`,
+      ],
+      classes: [
+        strongUp, weakUp,
+        { color: cfg.PROB_CLASSES[2].color, label: 'Normal o sin señal clara' },
+        weakLo, strongLo,
+        { color: cfg.NO_SKILL_COLOR, label: 'Sin habilidad comprobada' },
+      ],
+      shape: 'line',
+      note: 'Base: 33 % por tercil. Solo provincias costeras.',
+    };
+  }
+
+  /** Clic en un río en la vista de caudal costero: perspectiva del tramo y sus años análogos. */
+  private openOutlookRiver(props: any): void {
+    this.modalKind = 'outlook';
+    this.river = { comid: String(props.comid ?? ''), river: props.river ?? '',
+                   province: props.province ?? '', canton: props.canton ?? '' };
+    this.outlookRiver = null;
+    this.csvError = false;
+    this.cells['outlook'] = { state: 'loading' };
+    this.template.showDataModal();
+    setTimeout(() => {
+      const width = Math.round(Math.max(this.modalWidth.nativeElement.offsetWidth - 30, 300));
+      const comid = encodeURIComponent(this.river.comid);
+      this.loadPlot('outlook', `outlook-plot?comid=${comid}&width=${width}&height=400`, width).then(r => {
+        if (!r) { return; }
+        this.river = { ...this.river, river: r.river ?? this.river.river,
+                       province: r.province ?? this.river.province, canton: r.canton ?? this.river.canton };
+        const sf = this.outlookStatus?.streamflow;
+        const num = (v: any, d: number) => v === null || v === undefined || isNaN(Number(v)) ? '—'
+          : Number(v).toFixed(d).replace('.', ',').replace('-', '−');
+        this.outlookRiver = {
+          issue: cfg.monthYear(r.issue_month),
+          season: r.season && r.months ? `${r.season} (${r.months})`
+            : r.season && r.season === sf?.season ? this.seasonLabel(sf) : r.season ?? '',
+          skilful: typeof r.skilful === 'boolean' ? r.skilful : null, rpss: num(r.rpss, 2), bssP80: num(r.bss_p80, 2),
+          analogs: (r.analogs ?? []).map((a: any) => ({ year: a.year, weight: formatPct(a.weight), value: num(a.value, 1) })),
+        };
+      });
+    }, 300);
+  }
+
+  /** Clic en una celda C3S: probabilidades por sistema en esa celda, temporada y variable aplicadas. */
+  private openCell(props: any): void {
+    this.modalKind = 'cell';
+    const { layer, lead } = this.outlookApplied ?? { layer: this.outlookLayer, lead: this.outlookLead };
+    const variable = layer === 'temperature' ? 'temperature' : 'precipitation';
+    const season = this.outlookStatus?.c3s?.seasons?.find((x: any) => x.lead === lead);
+    const title = (lat: any, lon: any) => `Celda 1° · ${formatCoord(lat, 'S', 'N')}, ${formatCoord(lon, 'O', 'E')}`;
+    this.c3sCell = {
+      cellId: String(props.cell_id ?? ''), title: title(props.lat, props.lon),
+      variable: variable === 'precipitation' ? 'Lluvia' : 'Temperatura', season: this.seasonLabel(season),
+      source: `C3S · emisión ${cfg.monthYear(this.outlookStatus?.c3s?.issue_month)}`,
+    };
+    this.cells['c3sCell'] = { state: 'loading' };
+    this.template.showDataModal();
+    setTimeout(() => {
+      const width = Math.round(Math.max(this.modalWidth.nativeElement.offsetWidth - 30, 300));
+      this.loadPlot('c3sCell', `c3s-cell-plot?cell_id=${encodeURIComponent(this.c3sCell.cellId)}` +
+        `&variable=${variable}&lead=${lead}&width=${width}&height=400`, width).then(r => {
+        if (r?.cell) { this.c3sCell = { ...this.c3sCell, title: title(r.cell.lat, r.cell.lon) }; }
+      });
+    }, 300);
+  }
+
+
+  /*************************************************************************
    *                               Gráficas                                *
    *************************************************************************/
   public get layout() { return cfg.CHART_LAYOUTS[this.panelCount]; }
@@ -451,7 +698,7 @@ export class EnsoComponent implements AfterViewInit, OnDestroy {
     this.isPanelActive = isActive;
     setTimeout(() => {
       if (this.mode === 'pacific') { this.pacific?.invalidateSize(); }
-      if (this.mode === 'ecuador') { this.ecuador?.resize(); }
+      if (this.mode === 'ecuador' || this.mode === 'outlook') { this.ecuador?.resize(); }
       if (this.mode === 'charts') { window.dispatchEvent(new Event('resize')); }
     }, 250);
   }
@@ -461,6 +708,7 @@ export class EnsoComponent implements AfterViewInit, OnDestroy {
    *                          Modal de un río                              *
    *************************************************************************/
   private openRiver(props: any): void {
+    this.modalKind = 'composite';
     this.river = { comid: String(props.comid ?? ''), river: props.river ?? '',
                    province: props.province ?? '', canton: props.canton ?? '' };
     this.analogYears = [];
@@ -487,13 +735,14 @@ export class EnsoComponent implements AfterViewInit, OnDestroy {
     }, 300);
   }
 
-  public async downloadCsv(): Promise<void> {
+  /** CSV del río del modal: caudal esperado (composite-csv) o perspectiva (outlook-csv). */
+  public async downloadCsv(endpoint = 'composite-csv', prefix = 'enso_caudal'): Promise<void> {
     this.csvError = false;
     try {
-      const blob = await (await this.api(`composite-csv?comid=${encodeURIComponent(this.river.comid)}`)).blob();
+      const blob = await (await this.api(`${endpoint}?comid=${encodeURIComponent(this.river.comid)}`)).blob();
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = `enso_caudal_${this.river.comid}.csv`;
+      a.download = `${prefix}_${this.river.comid}.csv`;
       document.body.appendChild(a);
       a.click();
       a.remove();

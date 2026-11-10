@@ -312,6 +312,16 @@
   font-size: 0.9rem;
   margin-top: 8px;
 }
+.analog-table{
+  font-size: 0.85rem;
+  max-width: 520px;
+  caption-side: top;
+}
+.analog-table caption{
+  font-weight: bold;
+  color: #333;
+  padding-bottom: 2px;
+}
 .modal-error{
   color: #b2182b;
   font-size: 0.8rem;
@@ -339,6 +349,11 @@
 @container (max-width: 620px) {
   .label-long{ display: none; }
   .label-short{ display: inline; }
+}
+/* Cuatro botones en el teléfono (375 px): menos margen para que "Perspectiva" no toque el borde. */
+@container (max-width: 420px) {
+  .mode-bar{ gap: 4px; padding-left: 6px !important; padding-right: 6px !important; }
+  .mode-button{ padding: 0 7px !important; }
 }
 @container (max-width: 540px) {
   .with-buttons .reprod-title-text{ display: none; }   /* sin título caben los cuatro botones */

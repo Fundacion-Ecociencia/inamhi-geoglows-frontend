@@ -5,14 +5,16 @@
  *   Niño. La anomalía de TSM (WMS animado) la agrega el componente.
  * - EcuadorMap: mapa MapLibre con la red de drenaje de Martin coloreada por
  *   el caudal esperado (`mvt_enso_composite`) y la leyenda LegendControlEnso.
- *   MapLibre, como Hydroviewer, porque son 12 mil tramos vectoriales.
+ *   MapLibre, como Hydroviewer, porque son 12 mil tramos vectoriales. El mismo
+ *   mapa muestra la perspectiva estacional (malla C3S o caudal costero de
+ *   `mvt_enso_outlook`): `setView` decide qué capas se ven.
  *****************************************************************************/
 import * as L from 'leaflet';
 import maplibregl from 'maplibre-gl';
 import { env } from '../../../environments/environment';
 import {
-  CARTO_ATTRIBUTION, CompositeMetric, maskOpacity, NINO_REGIONS, PROB_CLASSES, probColorExpression,
-  RATIO_CLASSES, RATIO_NULL_COLOR,
+  c3sColorExpression, c3sOpacityExpression, CARTO_ATTRIBUTION, CompositeMetric, maskOpacity, NINO_REGIONS,
+  outlookColorExpression, outlookOpacityExpression, PROB_CLASSES, probColorExpression, RATIO_CLASSES, RATIO_NULL_COLOR,
 } from './enso.config';
 
 const VOYAGER = `https://basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}.png?key=${env.cartoKey}`;
@@ -75,6 +77,20 @@ export function createPacificMap(id: string): { map: L.Map; regions: L.LayerGrou
 /*****************************************************************************
  *                     Leyenda del caudal esperado (MapLibre)                *
  *****************************************************************************/
+/** Leyenda de una capa de la perspectiva estacional (la arma el componente con sus textos). */
+export interface OutlookLegend {
+  title: string;
+  /** Líneas de fuente, temporada, etc. (HTML ya escapado). */
+  lines: string[];
+  /** Clases en dos columnas (bajo | sobre lo normal) y luego las de una sola. */
+  columns?: { headers: [string, string]; rows: [string, string, string][] };
+  classes: { color: string; label: string; opacity?: number }[];
+  /** 'fill' para la malla C3S, 'line' para los ríos. */
+  shape: 'fill' | 'line';
+  note?: string;
+  missing?: string;
+}
+
 export class LegendControlEnso {
   private _container!: HTMLDivElement;
   private phase = '';
@@ -82,6 +98,8 @@ export class LegendControlEnso {
   private missing = false;
   private metric: CompositeMetric = 'prob';
   private mask = false;
+  /** Con valor, la leyenda es la de la perspectiva; con null, la del caudal esperado. */
+  private outlook: OutlookLegend | null = null;
 
   onAdd() {
     this._container = document.createElement('div');
@@ -102,12 +120,19 @@ export class LegendControlEnso {
     this.render();
   }
 
+  /** Cambia a la leyenda de la perspectiva (o, con null, vuelve a la del caudal esperado). */
+  public setOutlook(outlook: OutlookLegend | null): void {
+    this.outlook = outlook;
+    this.render();
+  }
+
   private render(): void {
     if (!this._container) { return; }
     // Dos columnas para que la leyenda ocupe poco alto en el teléfono.
     const swatch = (color: string, label: string) =>
       `<span><span style="display:inline-block;width:18px;height:4px;margin:0 5px 3px 0;` +
       `background:${color}"></span>${label}</span>`;
+    if (this.outlook) { this.renderOutlook(this.outlook, swatch); return; }
     const prob = this.metric === 'prob';
     this._container.innerHTML =
       (prob ? `<b>Probabilidad de caudal en el tercio alto o bajo</b><br>`
@@ -122,6 +147,25 @@ export class LegendControlEnso {
           swatch(RATIO_NULL_COLOR, 'Sin dato') + `</div>`) +
       (this.missing ? `<div style="color:#b2182b"><b>La capa de caudal esperado aún no está publicada.</b></div>` : '');
   }
+
+  private renderOutlook(o: OutlookLegend, line: (color: string, label: string) => string): void {
+    // Celdas: cuadro de color con su opacidad real sobre el mapa; ríos: la misma raya del caudal esperado.
+    const box = (color: string, label = '', opacity = 1) =>
+      `<span><span style="display:inline-block;width:12px;height:12px;margin:0 5px -2px 0;` +
+      `border:1px solid rgba(0,0,0,0.25);background:${color};opacity:${opacity}"></span>${label}</span>`;
+    const swatch = (c: { color: string; label: string; opacity?: number }) =>
+      o.shape === 'fill' ? box(c.color, c.label, c.opacity ?? 1) : line(c.color, c.label);
+    const grid = o.columns
+      ? `<div style="display:grid;grid-template-columns:auto auto auto;column-gap:6px;align-items:center">` +
+        `<span></span><b>${o.columns.headers[0]}</b><b>${o.columns.headers[1]}</b>` +
+        o.columns.rows.map(([label, lo, up]) => `<span>${label}</span>${box(lo)}${box(up)}`).join('') + `</div>`
+      : '';
+    this._container.innerHTML =
+      `<b>${o.title}</b><br>` + o.lines.join('<br>') + grid +
+      `<div>${o.classes.map(swatch).join('<br>')}</div>` +
+      (o.note ? `<div style="color:#444">${o.note}</div>` : '') +
+      (o.missing ? `<div style="color:#b2182b"><b>${o.missing}</b></div>` : '');
+  }
 }
 
 
@@ -135,6 +179,16 @@ const COMPOSITE_SOURCE_LAYER = 'enso_composite';
 const COMPOSITE_LAYER = 'enso-composite-line';
 const HIT_LAYER = 'enso-drainage-hit';
 const PROVINCES = 'enso-provinces';
+const BASE_DRAINAGE_LAYER = 'enso-drainage';
+/** Perspectiva estacional: malla C3S (GeoJSON de la API) y caudal costero (Martin). */
+const C3S = 'enso-c3s-grid';
+const C3S_LAYER = 'enso-c3s-fill';
+const OUTLOOK = 'mvt_enso_outlook';
+const OUTLOOK_SOURCE_LAYER = 'enso_outlook';
+const OUTLOOK_LAYER = 'enso-outlook-line';
+
+/** Qué muestra el mapa: el caudal esperado según la fase, la malla C3S o el caudal costero. */
+export type EcuadorView = 'composite' | 'c3s' | 'streamflow';
 
 /** Ancho por orden de Strahler, como Hydroviewer. Si el tramo no trae `order`, 0,75. */
 const LINE_WIDTH: any = [
@@ -156,8 +210,18 @@ export class EcuadorMap {
   public map: maplibregl.Map;
   public legend = new LegendControlEnso();
   private ready: Promise<void>;
+  private view: EcuadorView = 'composite';
+  /** Si Martin no tiene la capa de caudal costero, se deja ver la red de base en gris. */
+  private streamflowMissing = false;
+  /** Última leyenda de cada capa de la perspectiva, para restaurarla al volver a esa vista. */
+  private outlookLegends: Partial<Record<EcuadorView, OutlookLegend>> = {};
 
-  constructor(container: string, mobile: boolean, onRiverClick: (props: any) => void) {
+  /**
+   * `onRiverClick` recibe la vista activa para que el componente abra el modal que corresponde
+   * (caudal esperado o perspectiva de caudal); `onCellClick`, las propiedades de la celda C3S.
+   */
+  constructor(container: string, mobile: boolean, onRiverClick: (props: any, view: EcuadorView) => void,
+              private onCellClick: (props: any) => void = () => {}) {
     this.map = new maplibregl.Map({
       container, center: [-78.5, -1.7], zoom: 6, dragPan: !mobile,
       style: { version: 8, sources: {}, layers: [] },
@@ -178,7 +242,7 @@ export class EcuadorMap {
     }));
   }
 
-  private addLayers(onRiverClick: (props: any) => void): void {
+  private addLayers(onRiverClick: (props: any, view: EcuadorView) => void): void {
     const map = this.map;
     map.addSource('carto', { type: 'raster', tiles: [VOYAGER], tileSize: 256, attribution: CARTO_ATTRIBUTION });
     map.addLayer({ id: 'carto-layer', type: 'raster', source: 'carto' });
@@ -194,7 +258,7 @@ export class EcuadorMap {
     // Red de drenaje de base: se ve aunque el composite aún no exista.
     map.addSource(DRAINAGE, { type: 'vector', tiles: [`${env.urlMartin}/${DRAINAGE}/{z}/{x}/{y}`] });
     map.addLayer({
-      id: 'enso-drainage', type: 'line', source: DRAINAGE, 'source-layer': DRAINAGE,
+      id: BASE_DRAINAGE_LAYER, type: 'line', source: DRAINAGE, 'source-layer': DRAINAGE,
       paint: { 'line-color': RATIO_NULL_COLOR, 'line-width': LINE_WIDTH },
     });
     // Capa invisible y ancha para que el clic sea fácil (como Hydroviewer).
@@ -202,11 +266,107 @@ export class EcuadorMap {
       id: HIT_LAYER, type: 'line', source: DRAINAGE, 'source-layer': DRAINAGE,
       paint: { 'line-color': 'rgba(0,0,0,0)', 'line-width': 7 },
     });
+    // La capa de clic se oculta en la vista C3S: una capa oculta no recibe eventos.
     map.on('click', HIT_LAYER, (e: any) => {
-      if (e.features?.length) { onRiverClick(e.features[0].properties); }
+      if (e.features?.length) { onRiverClick(e.features[0].properties, this.view); }
     });
     map.on('mouseenter', HIT_LAYER, () => { map.getCanvas().style.cursor = 'pointer'; });
     map.on('mouseleave', HIT_LAYER, () => { map.getCanvas().style.cursor = ''; });
+    // La malla C3S cambia de fuente en cada selección, pero el id de la capa es fijo: los eventos
+    // registrados por id siguen valiendo tras quitarla y agregarla.
+    map.on('click', C3S_LAYER, (e: any) => {
+      if (e.features?.length) { this.onCellClick(e.features[0].properties); }
+    });
+    map.on('mouseenter', C3S_LAYER, () => { map.getCanvas().style.cursor = 'pointer'; });
+    map.on('mouseleave', C3S_LAYER, () => { map.getCanvas().style.cursor = ''; });
+  }
+
+  /**
+   * Qué capas se ven en cada vista. Se llama al cambiar de vista y cada vez que se agrega una
+   * capa, así el orden en que terminan las peticiones no importa.
+   */
+  private applyView(): void {
+    const map = this.map;
+    const v = this.view;
+    const show: Record<string, boolean> = {
+      [BASE_DRAINAGE_LAYER]: v === 'composite' || (v === 'streamflow' && this.streamflowMissing),
+      [COMPOSITE_LAYER]: v === 'composite',
+      [HIT_LAYER]: v !== 'c3s',
+      [C3S_LAYER]: v === 'c3s',
+      [OUTLOOK_LAYER]: v === 'streamflow',
+    };
+    Object.entries(show).forEach(([id, visible]) => {
+      if (map.getLayer(id)) { map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none'); }
+    });
+  }
+
+  private setOutlookLegend(view: EcuadorView, legend: OutlookLegend): void {
+    this.outlookLegends[view] = legend;
+    if (this.view === view) { this.legend.setOutlook(legend); }
+  }
+
+  /** Cambia de vista; con 'composite' la leyenda vuelve a la del caudal esperado. */
+  public async setView(view: EcuadorView): Promise<void> {
+    this.view = view;
+    await this.ready;
+    this.legend.setOutlook(view === 'composite' ? null : this.outlookLegends[view] ?? null);
+    this.applyView();
+  }
+
+  /**
+   * Malla C3S: GeoJSON de `c3s-grid`, debajo de los límites provinciales para que se lean encima.
+   * Con `data` null solo se quita (sin emisión o la petición falló).
+   */
+  public async setC3sGrid(data: any | null, variable: 'precipitation' | 'temperature',
+                          legend: OutlookLegend): Promise<void> {
+    await this.ready;
+    const map = this.map;
+    if (map.getLayer(C3S_LAYER)) { map.removeLayer(C3S_LAYER); }
+    if (map.getSource(C3S)) { map.removeSource(C3S); }
+    this.setOutlookLegend('c3s', legend);
+    if (!data) { return; }
+    map.addSource(C3S, { type: 'geojson', data });
+    map.addLayer({
+      id: C3S_LAYER, type: 'fill', source: C3S,
+      paint: {
+        'fill-color': c3sColorExpression(variable),
+        'fill-opacity': c3sOpacityExpression(),
+        'fill-outline-color': 'rgba(0,0,0,0.25)',
+      },
+    }, PROVINCES);
+    this.applyView();
+  }
+
+  /**
+   * Caudal costero de Martin, con el mismo patrón que `setComposite`: la emisión va en la URL, y
+   * si el TileJSON da 404 se devuelve false y la red de base queda en gris.
+   */
+  public async setStreamflowOutlook(issue: string, legend: OutlookLegend, missingText: string): Promise<boolean> {
+    await this.ready;
+    const map = this.map;
+    if (map.getLayer(OUTLOOK_LAYER)) { map.removeLayer(OUTLOOK_LAYER); }
+    if (map.getSource(OUTLOOK)) { map.removeSource(OUTLOOK); }
+    this.streamflowMissing = false;
+    this.setOutlookLegend('streamflow', legend);
+    map.addSource(OUTLOOK, {
+      type: 'vector', tiles: [`${env.urlMartin}/${OUTLOOK}/{z}/{x}/{y}?issue=${encodeURIComponent(issue)}`],
+    });
+    map.addLayer({
+      id: OUTLOOK_LAYER, type: 'line', source: OUTLOOK, 'source-layer': OUTLOOK_SOURCE_LAYER,
+      paint: {
+        'line-color': outlookColorExpression(),
+        'line-width': LINE_WIDTH,
+        'line-opacity': outlookOpacityExpression(),
+      },
+    }, HIT_LAYER);
+    this.applyView();
+    const ok = await fetch(`${env.urlMartin}/${OUTLOOK}`).then(r => r.ok, () => false);
+    if (!ok) {
+      this.streamflowMissing = true;
+      this.setOutlookLegend('streamflow', { ...legend, missing: missingText });
+      this.applyView();
+    }
+    return ok;
   }
 
   /**
@@ -230,6 +390,7 @@ export class EcuadorMap {
         'line-opacity': metric === 'prob' ? maskOpacity(mask) : 1,
       },
     }, HIT_LAYER);
+    this.applyView();
     // MapLibre toma una tesela 404 como vacía y no avisa: si la función aún no
     // existe en Martin, su TileJSON da 404 y se dice en la leyenda. Los tramos
     // quedan en gris (sin dato), sin romper la vista.

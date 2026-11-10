@@ -97,6 +97,66 @@
       <div class="panel-note"><b>Nota:</b> el tipo y el índice de cada gráfica se eligen en su cabecera. Al abrir se comparan, año por mes, el ICEN de la costa y el ONI del Pacífico central.</div>
     </app-dropdown>
 
+    <app-dropdown iconClass="fa-solid fa-cloud-sun-rain" title="Perspectiva estacional">
+      @if (outlookStatus) {
+        <mat-form-field class="select scaled" appearance="outline">
+          <mat-label>Capa:</mat-label>
+          <mat-select [(ngModel)]="outlookLayer">
+            @for (l of cfg.OUTLOOK_LAYERS; track l.value) {
+              <mat-option class="scaled-text" [value]="l.value" [disabled]="!outlookProduct(l.value)">
+                {{ l.label }}@if (!outlookProduct(l.value)) { (aún no hay emisión)}
+              </mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        @if (outlookLayer !== 'streamflow' && outlookStatus.c3s) {
+          <mat-form-field class="select scaled" appearance="outline">
+            <mat-label>Modelo:</mat-label>
+            <mat-select [(ngModel)]="outlookSystem">
+              @for (m of outlookStatus.c3s.systems; track m.system) {
+                <mat-option class="scaled-text" [value]="m.system" [disabled]="!m.available">
+                  {{ m.label }}@if (!m.available) { (sin emisión)}
+                </mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field class="select scaled" appearance="outline">
+            <mat-label>Temporada:</mat-label>
+            <mat-select [(ngModel)]="outlookLead">
+              @for (t of outlookStatus.c3s.seasons; track t.lead) {
+                <mat-option class="scaled-text" [value]="t.lead">{{ seasonLabel(t) }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+        }
+        @if (outlookLayer === 'streamflow' && outlookStatus.streamflow) {
+          <div class="status-card">
+            <div class="status-title">Temporada: {{ seasonLabel(outlookStatus.streamflow) }}</div>
+            <div>Predictor: {{ outlookPredictor }}</div>
+            <div>Emisión: {{ cfg.monthYear(outlookStatus.streamflow.issue_month) }}</div>
+          </div>
+        }
+        @if (!outlookProduct()) {
+          <div class="panel-warning">Aún no hay emisión</div>
+        }
+        <button mat-stroked-button class="dark-mode update-button scaled" [disabled]="!outlookProduct()" (click)="applyOutlook()">
+          <i class="fa-solid fa-arrows-rotate" style="margin-right: 4px;"></i> Actualizar
+        </button>
+        @if (outlookLayer === 'streamflow') {
+          <div class="panel-note"><b>Nota:</b> caudal simulado GEOGLOWS, solo provincias costeras. Gris: sin habilidad comprobada.</div>
+        } @else {
+          <div class="panel-note"><b>Nota:</b> probabilidad del tercil dominante. Gris: sin habilidad comprobada (retroprevisiones 1993–2016).</div>
+        }
+        @if (outlookStatus.attribution) {
+          <div class="panel-note">{{ outlookStatus.attribution }}</div>
+        }
+      } @else if (outlookStatusFailed) {
+        <div class="status-card status-empty">Aún no hay emisión</div>
+      } @else {
+        <div class="status-card status-empty">Cargando…</div>
+      }
+    </app-dropdown>
+
     <app-dropdown iconClass="fa-solid fa-layer-group" title="Capas e información">
       <div class="panel-subtitle">Ecuador</div>
       <div class="form-check form-switch">
@@ -133,10 +193,14 @@
       <div id="map-pacific" class="map"></div>
       @if (sstMessage) { <div class="map-message" role="status">{{ sstMessage }}</div> }
     </div>
-    <div class="map-view" [class.is-hidden]="mode !== 'ecuador'">
+    <!-- Ecuador y Perspectiva comparten el mapa de MapLibre: cambian las capas, no el mapa. -->
+    <div class="map-view" [class.is-hidden]="mode !== 'ecuador' && mode !== 'outlook'">
       <div id="map-ecuador" class="map"></div>
-      @if (compositeMissing) {
+      @if (mode === 'ecuador' && compositeMissing) {
         <div class="map-message" role="status">La capa de caudal esperado aún no está publicada en Martin</div>
+      }
+      @if (mode === 'outlook' && outlookMessage) {
+        <div class="map-message" role="status">{{ outlookMessage }}</div>
       }
     </div>
 
@@ -242,17 +306,57 @@
   <!------------------------------------------------------------------------------->
   <div dataModalHeader>
     <div class="container" #modalWidth>
-      <div class="modal-header-title">CAUDAL ESPERADO SEGÚN EL ENSO</div>
-      <div class="row modal-header-content">
-        <div class="col-sm-12 col-md-3 py-1"><b>RÍO:</b> {{ river.river }}</div>
-        <div class="col-sm-12 col-md-3 py-1"><b>PROVINCIA:</b> {{ river.province }}</div>
-        <div class="col-sm-12 col-md-3 py-1"><b>CANTÓN:</b> {{ river.canton }}</div>
-        <div class="col-sm-12 col-md-3 py-1"><b>COMID:</b> {{ river.comid }}</div>
-      </div>
+      @if (modalKind === 'cell') {
+        <div class="modal-header-title">PERSPECTIVA ESTACIONAL C3S</div>
+        <div class="row modal-header-content">
+          <div class="col-sm-12 col-md-3 py-1"><b>{{ c3sCell.title }}</b></div>
+          <div class="col-sm-12 col-md-3 py-1"><b>VARIABLE:</b> {{ c3sCell.variable }}</div>
+          <div class="col-sm-12 col-md-3 py-1"><b>TEMPORADA:</b> {{ c3sCell.season }}</div>
+          <div class="col-sm-12 col-md-3 py-1">{{ c3sCell.source }}</div>
+        </div>
+      } @else {
+        <div class="modal-header-title">{{ modalKind === 'outlook' ? 'PERSPECTIVA ESTACIONAL DE CAUDAL' : 'CAUDAL ESPERADO SEGÚN EL ENSO' }}</div>
+        <div class="row modal-header-content">
+          <div class="col-sm-12 col-md-3 py-1"><b>RÍO:</b> {{ river.river }}</div>
+          <div class="col-sm-12 col-md-3 py-1"><b>PROVINCIA:</b> {{ river.province }}</div>
+          <div class="col-sm-12 col-md-3 py-1"><b>CANTÓN:</b> {{ river.canton }}</div>
+          <div class="col-sm-12 col-md-3 py-1"><b>COMID:</b> {{ river.comid }}</div>
+        </div>
+      }
     </div>
   </div>
 
   <div dataModalBody>
+    @if (modalKind === 'cell') {
+      <ng-container *ngTemplateOutlet="plotCell; context: { $implicit: cells['c3sCell'], height: '400px' }"></ng-container>
+      <p class="analog-years">Probabilidad de cada tercil por sistema; la línea marca el 33 % de un año cualquiera.
+        La habilidad de cada sistema en esta celda (RPSS y área ROC, retroprevisiones 1993–2016) aparece al pasar el cursor.</p>
+    } @else if (modalKind === 'outlook') {
+      <ng-container *ngTemplateOutlet="plotCell; context: { $implicit: cells['outlook'], height: '400px' }"></ng-container>
+      @if (outlookRiver) {
+        <p class="analog-years">
+          <b>Temporada:</b> {{ outlookRiver.season }} · <b>Emisión:</b> {{ outlookRiver.issue }} ·
+          <b>Habilidad:</b> RPSS {{ outlookRiver.rpss }}
+          ({{ outlookRiver.skilful === null ? 'sin dato' : outlookRiver.skilful ? 'con habilidad comprobada' : 'sin habilidad comprobada' }}) ·
+          BSS sobre el P80 {{ outlookRiver.bssP80 }}
+        </p>
+        @if (outlookRiver.analogs.length) {
+          <table class="table table-sm analog-table">
+            <caption>Años análogos</caption>
+            <thead><tr><th scope="col">Año</th><th scope="col">Peso</th><th scope="col">Caudal medio de la temporada (m³/s)</th></tr></thead>
+            <tbody>
+              @for (a of outlookRiver.analogs; track a.year) {
+                <tr><td>{{ a.year }}</td><td>{{ a.weight }}</td><td>{{ a.value }}</td></tr>
+              }
+            </tbody>
+          </table>
+        }
+      }
+      <button type="button" class="btn btn-primary btn-sm" (click)="downloadCsv('outlook-csv', 'enso_perspectiva')">
+        <i class="fa-solid fa-download"></i>&nbsp; Descargar CSV
+      </button>
+      @if (csvError) { <span class="modal-error">No se pudo descargar el CSV.</span> }
+    } @else {
     @if (!river.comid) {
       <p class="analog-years">Haga clic en un río del mapa de Ecuador para ver su caudal esperado según el ENSO.</p>
     }
@@ -288,6 +392,7 @@
         <ng-container *ngTemplateOutlet="plotCell; context: { $implicit: cells['icen'], height: '400px' }"></ng-container>
       </div>
     </div>
+    }
   </div>
 
 
@@ -318,11 +423,13 @@
       <li><b>MEI.v2:</b> NOAA Physical Sciences Laboratory (PSL).</li>
       <li><b>Pronóstico oficial del ENSO (probabilidades y RONI pronosticado):</b> NOAA CPC, una emisión por mes desde abril de 2026.</li>
       <li><b>Caudales:</b> simulación retrospectiva de GEOGLOWS v2 para los ríos del Ecuador.</li>
+      <li><b>Pronósticos estacionales de lluvia y temperatura:</b> Copernicus Climate Change Service (C3S), CC-BY 4.0. Observado para la habilidad: CHIRPS (lluvia) y ERA5 (temperatura).</li>
     </ul>
     <h3>Actualización</h3>
     <p>
       Índices y temperatura del mar: todos los días a las 09:30 de Ecuador (UTC−5). Caudal esperado por fase:
-      el día 6 de cada mes.
+      el día 6 de cada mes. Perspectiva estacional: se revisa todos los días a las 09:30 de Ecuador (UTC−5) y se
+      actualiza cuando hay una emisión nueva (C3S publica la suya hacia el día 13 de cada mes).
     </p>
     <h3>Fases del Niño costero</h3>
     <p>
@@ -383,6 +490,24 @@
       moderada o mayor, casi nada pasa la prueba aunque 3 de cada 4 años hayan sido altos: es un límite de la muestra,
       no la ausencia de señal.
     </p>
+    <h3>Perspectiva estacional</h3>
+    <p>
+      La vista "Perspectiva" muestra pronósticos de los próximos tres meses en terciles: bajo lo normal, normal y
+      sobre lo normal, cada uno con 33 % en un año cualquiera. El color es el tercil más probable y su intensidad, la
+      probabilidad de ese tercil. <b>Lluvia y temperatura</b> vienen de los sistemas de pronóstico estacional del
+      Copernicus Climate Change Service (C3S) y de su multimodelo (media de las probabilidades de los sistemas
+      disponibles, todos con el mismo peso), en una malla de 1° que cubre el Ecuador continental y Galápagos. La
+      habilidad se midió con las retroprevisiones 1993–2016 frente a CHIRPS (lluvia) y ERA5 (temperatura): una celda
+      tiene habilidad comprobada si el área ROC del tercil dominante pasa de 0,6 y el RPSS es positivo; si no, se
+      dibuja en gris tenue. Clic en una celda para ver la probabilidad de cada sistema.
+    </p>
+    <p>
+      <b>Caudal (costa)</b> es el caudal medio simulado por GEOGLOWS de los tres meses siguientes, solo en las
+      provincias costeras, estimado con los años análogos según la anomalía de Niño 1+2 (OISST) del mes anterior. Un
+      tramo tiene habilidad comprobada si su RPSS en las retroprevisiones pasa de 0,05. Clic en un río para ver su
+      distribución, los años análogos con su peso y descargar el CSV.
+    </p>
+
     <h3>Advertencia</h3>
     <p>
       El caudal esperado es el promedio de los años que tuvieron esa fase del ICEN. Algunas fases, como la cálida
