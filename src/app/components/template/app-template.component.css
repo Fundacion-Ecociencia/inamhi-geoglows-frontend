@@ -86,7 +86,15 @@
 }
 
 .img-log{
-  width: 500px !important;
+  /* 1000 px de imagen a 579: los logos de INAMHI, BYU y EcoCiencia quedan del tamaño de antes.
+     Si el encabezado es más angosto (modal-xl mide 500 px entre 576 y 991 px de pantalla), se
+     achica para que el botón de cerrar siga a la vista. */
+  width: 579px !important;
+  max-width: 100%;
+}
+.logo-box{
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 /* State 1 */
