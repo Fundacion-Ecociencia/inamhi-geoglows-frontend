@@ -86,7 +86,8 @@
 }
 
 .img-log{
-  width: 500px !important;
+  /* 1000 px de imagen a 579: los logos de INAMHI, BYU y EcoCiencia quedan del tamaño de antes */
+  width: 579px !important;
 }
 
 /* State 1 */
