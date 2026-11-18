@@ -1,0 +1,42 @@
+{
+  "comentario": "Qué modelo y qué esfuerzo pide cada nivel de riesgo y cada tipo de tarea. El proyecto puede cambiar valores en `orquestacion` de .harness/proyecto.json. Los nombres de modelo son los alias de Claude Code; `rangos` ordena las familias para comparar con el mínimo.",
+  "rangos": { "haiku": 1, "sonnet": 2, "opus": 3, "fable": 4, "mythos": 4 },
+  "niveles": {
+    "bajo": {
+      "modelo": "sonnet",
+      "esfuerzo": "medium",
+      "modeloMinimo": "haiku",
+      "plan": "no",
+      "pruebas": "la verificación rápida",
+      "revisor": "no hace falta",
+      "ejemplos": "documentación, textos, pruebas, estilos"
+    },
+    "medio": {
+      "modelo": "opus",
+      "esfuerzo": "high",
+      "modeloMinimo": "sonnet",
+      "plan": "si pasa de un paso",
+      "pruebas": "camino feliz, «no existe» y error, ejecutadas",
+      "revisor": "subagente revisor antes del pull request",
+      "ejemplos": "un endpoint, un pipeline, una vista"
+    },
+    "alto": {
+      "modelo": "opus",
+      "esfuerzo": "xhigh",
+      "modeloMinimo": "opus",
+      "plan": "siempre, aprobado por una persona antes del código",
+      "pruebas": "arnés que falla con la versión anterior, más simulación en una copia contra la base real, sin escribir",
+      "revisor": "subagente revisor, y revisor-de-metodo si cambia un método científico",
+      "ejemplos": "esquema de la base, carga del pronóstico, scripts de secretos, crontab, despliegue"
+    }
+  },
+  "tareas": {
+    "explorar el código o leer registros": { "subagente": "explorador", "modelo": "haiku", "esfuerzo": "low" },
+    "diagnosticar producción (solo lectura)": { "subagente": "operador", "modelo": "sonnet", "esfuerzo": "medium" },
+    "escribir pruebas y arneses": { "subagente": "probador", "modelo": "sonnet", "esfuerzo": "high" },
+    "revisar un cambio": { "subagente": "revisor", "modelo": "opus", "esfuerzo": "high" },
+    "revisar un método científico": { "subagente": "revisor-de-metodo", "modelo": "opus", "esfuerzo": "xhigh" },
+    "auditar seguridad": { "subagente": "auditor-seguridad", "modelo": "opus", "esfuerzo": "high" },
+    "redactar el registro diario o un pull request": { "skill": "registro, entregar", "modelo": "sonnet", "esfuerzo": "low" }
+  }
+}

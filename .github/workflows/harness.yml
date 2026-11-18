@@ -1,0 +1,72 @@
+# harness — lo escribe el instalador; para cambiarlo, cambia el repositorio del harness.
+#
+# En cada pull request: secretos, riesgo del cambio y las verificaciones del
+# proyecto que aplican a lo que cambió. No despliega nada y no tiene acceso a
+# producción: no usa ningún secreto del repositorio.
+name: harness
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: harness-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secretos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: gitleaks sobre los commits del pull request
+        run: |
+          curl -sSfL -o /tmp/gitleaks.tgz https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          tar -xzf /tmp/gitleaks.tgz -C /tmp gitleaks
+          base="${{ github.event.pull_request.base.sha }}"
+          /tmp/gitleaks git --redact --no-banner ${base:+--log-opts="$base..HEAD"}
+
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: El harness está completo
+        run: node .harness/bin/doctor.mjs --ci
+      - name: Riesgo del cambio
+        run: |
+          base="origin/${{ github.base_ref || 'main' }}"
+          node .harness/bin/riesgo.mjs --base "$base" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Dependencias del proyecto
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq expect shellcheck >/dev/null
+          # Con requirements.txt, eso. Sin él, lo que el proyecto declaró en `ci.pip` de proyecto.json.
+          if [ -f requirements.txt ]; then pip install -q -r requirements.txt
+          else
+            paquetes=$(node -e 'const c=require("./.harness/proyecto.json");process.stdout.write((c.ci?.pip??[]).join(" "))')
+            [ -z "$paquetes" ] || pip install -q $paquetes
+          fi
+          if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; fi
+      - name: Verificaciones que aplican a lo que cambió
+        run: |
+          base="origin/${{ github.base_ref || 'main' }}"
+          set +e
+          node .harness/bin/verificar.mjs --base "$base" | tee -a "$GITHUB_STEP_SUMMARY"
+          codigo=${PIPESTATUS[0]}
+          # 3 = el proyecto todavía no declaró verificaciones: se avisa, no se falla.
+          [ "$codigo" = 3 ] && exit 0
+          exit "$codigo"
+      - name: shellcheck (solo errores) en los scripts que cambia el pull request
+        run: |
+          base="origin/${{ github.base_ref || 'main' }}"
+          archivos=$(git diff --name-only --diff-filter=ACMR "$base"...HEAD -- '*.sh')
+          [ -z "$archivos" ] || shellcheck --severity=error $archivos

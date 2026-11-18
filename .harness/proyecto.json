@@ -1,0 +1,69 @@
+{
+  "nombre": "INAMHI GEOGLOWS — frontend",
+  "entrega": "pr",
+  "publico": true,
+  "coautoria": false,
+  "zonaHoraria": "America/Guayaquil",
+  "stacks": [
+    "angular"
+  ],
+  "noPublicar": [
+    "\\b(?!127\\.0\\.0\\.1\\b|0\\.0\\.0\\.0\\b)(?:\\d{1,3}\\.){3}\\d{1,3}:\\d{2,5}\\b",
+    "/home/ubuntu/",
+    "\\bec2-\\d+-\\d+-\\d+-\\d+",
+    "\\bPOSTGRES_(USER|PASSWORD|DB|PORT)\\d*\\b",
+    "\\.pem\\b|\\.ppk\\b"
+  ],
+  "produccion": {
+    "hosts": [
+      "inamhi-geoglows",
+      "inamhi-geoglows-platform",
+      "inamhi.geoglows.org",
+      "services.geoglows.org"
+    ],
+    "remotos": [],
+    "rutasDeTerceros": [],
+    "tablasGrandes": []
+  },
+  "riesgo": {
+    "alto": [
+      "src/environments/**",
+      "angular.json",
+      "scripts/**",
+      ".github/workflows/**"
+    ],
+    "bajo": [
+      "*.md",
+      "src/assets/**",
+      "**/*.scss",
+      "**/*.css",
+      "**/*.spec.ts",
+      ".github/pull_request_template.md"
+    ]
+  },
+  "verificar": [
+    {
+      "nombre": "Tipos de TypeScript",
+      "cuando": [
+        "src/**/*.ts",
+        "tsconfig*.json"
+      ],
+      "rapido": true,
+      "correr": "npx --no-install tsc -p tsconfig.app.json --noEmit"
+    },
+    {
+      "nombre": "Compilación",
+      "cuando": [
+        "src/",
+        "angular.json",
+        "package.json"
+      ],
+      "minutos": 10,
+      "correr": "npm run build 2>&1 | tee /tmp/harness-ng-build.log; grep -q 'Application bundle generation complete\\|bundle initial exceeded maximum budget' /tmp/harness-ng-build.log && ! grep -q 'error TS\\|NG[0-9]\\{4\\}:.*error\\|Could not resolve' /tmp/harness-ng-build.log"
+    }
+  ],
+  "ramaPrincipal": "main",
+  "harness": {
+    "version": "0.1.0"
+  }
+}
