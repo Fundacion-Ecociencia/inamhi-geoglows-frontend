@@ -40,6 +40,12 @@
     {"id": "conexion-con-variables", "tipo": "archivo", "origen": "La conexión se arma con variables de entorno.", "ruta": "tasks/ejemplo.py", "texto": "token = f\"postgresql+psycopg2://{DB_USER}:{DB_PASS}@localhost:{DB_PORT}/{DB_NAME}\"", "espera": "pasa"},
     {"id": "editar-env", "tipo": "archivo", "origen": "El .env lo edita una persona.", "ruta": ".env", "texto": "POSTGRES_PASSWORD=x", "espera": "deny", "regla": "archivo-de-secretos"},
     {"id": "editar-lo-de-terceros", "tipo": "archivo", "origen": "Lo que mantiene otro equipo se acuerda antes.", "ruta": "{TERCEROS}", "texto": "numero = 80", "espera": "ask", "regla": "ruta-de-terceros"},
-    {"id": "interno-en-repo-publico", "tipo": "archivo", "soloPublico": true, "origen": "Texto interno llegó a un repositorio público.", "ruta": "README.md", "texto": "El backend corre en /home/ubuntu/app y escucha en 10.0.0.5:8000", "espera": "deny", "regla": "repo-publico"}
+    {"id": "interno-en-repo-publico", "tipo": "archivo", "soloPublico": true, "origen": "Texto interno llegó a un repositorio público.", "ruta": "README.md", "texto": "El backend corre en /home/ubuntu/app y escucha en 10.0.0.5:8000", "espera": "deny", "regla": "repo-publico"},
+    {"id": "sustitucion-que-escribe", "origen": "Revisión de Codex del 18 nov 2026: `echo $(…)` ejecuta lo de adentro antes de imprimir y pasaba como lectura.", "comando": "ssh {PROD} 'echo $(systemctl restart api.service)'", "espera": "ask", "regla": "produccion-escritura"},
+    {"id": "sustitucion-que-lee-secretos", "origen": "Ídem: un `cat .env` dentro de una sustitución.", "comando": "ssh {PROD} 'echo \"$(cat ~/app/.env)\"'", "espera": "deny", "regla": "leer-secretos"},
+    {"id": "comillas-invertidas", "origen": "Ídem, con comillas invertidas.", "comando": "ssh {PROD} 'ls `rm -rf ~/app/logs`'", "espera": "ask", "regla": "produccion-escritura"},
+    {"id": "xargs-que-escribe", "origen": "Revisión de Codex del 18 nov 2026: `xargs tee archivo` pasaba porque tee estaba en la lista de lectura.", "comando": "ssh {PROD} 'xargs tee ~/app/config.json'", "espera": "ask", "regla": "produccion-escritura"},
+    {"id": "xargs-de-lectura", "origen": "Buscar en registros con xargs es diagnóstico normal.", "comando": "ssh {PROD} 'find ~/app/logs -name \"*.log\" -mtime -1 | xargs grep -c ERROR'", "espera": "pasa"},
+    {"id": "sustitucion-de-lectura", "origen": "Una sustitución que solo lee es diagnóstico normal.", "comando": "ssh {PROD} 'tail -5 $(ls -t ~/app/logs/*.log | head -1)'", "espera": "pasa"}
   ]
 }

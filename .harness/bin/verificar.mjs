@@ -21,7 +21,8 @@
 
 import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { evaluate } from "../hooks/guardia-bash.mjs";
@@ -217,7 +218,14 @@ function matarGrupo(hijo, senal) {
   }
 }
 
-export function correrUna(raiz, v, { minutosMax = Infinity } = {}) {
+/**
+ * Corre una verificación. El comando recibe en `HARNESS_LISTA` la ruta de un
+ * archivo con los archivos cambiados que le tocan (uno por línea): los mismos
+ * que eligió el verificador, estén sin guardar, en el índice o ya en commits
+ * de la rama. Un comando que los busca por su cuenta con `git ls-files -m`
+ * no ve los que ya están en un commit, y en el CI no revisaría nada.
+ */
+export function correrUna(raiz, v, { minutosMax = Infinity, archivos = [] } = {}) {
   // Un comando que la guardia del harness no dejaría correr tampoco corre aquí.
   const veredicto = evaluate(v.correr, { root: raiz, config: leerProyecto(raiz) });
   if (veredicto) {
@@ -227,13 +235,17 @@ export function correrUna(raiz, v, { minutosMax = Infinity } = {}) {
     });
   }
   const minutos = Math.min(v.minutos, minutosMax);
+  const propios = v.cuando?.length ? archivos.filter((ruta) => coincide(ruta, v.cuando)) : archivos;
+  const carpeta = mkdtempSync(join(tmpdir(), "harness-lista-"));
+  const lista = join(carpeta, "archivos.txt");
+  writeFileSync(lista, propios.length ? `${propios.join("\n")}\n` : "");
   return new Promise((listo) => {
     const inicio = Date.now();
     let salida = "";
     let terminado = false;
     let motivo = null;
     const hijo = spawn("sh", ["-c", v.correr], {
-      cwd: raiz, detached: true, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, CI: process.env.CI ?? "1" },
+      cwd: raiz, detached: true, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, CI: process.env.CI ?? "1", HARNESS_LISTA: lista },
     });
     const guardar = (d) => {
       salida += d.toString();
@@ -246,6 +258,7 @@ export function correrUna(raiz, v, { minutosMax = Infinity } = {}) {
       terminado = true;
       clearTimeout(reloj);
       matarGrupo(hijo, "SIGKILL"); // Nada de lo que lanzó queda vivo.
+      rmSync(carpeta, { recursive: true, force: true });
       const ok = codigo === 0 && !motivo;
       listo({
         nombre: v.nombre,
@@ -284,7 +297,7 @@ export async function verificar(raiz, { rapido = false, todo = false, base = nul
   const elegidas = elegir(verificaciones, cambios, { rapido, todo });
   const resultados = [];
   // Una a la vez: dos suites a la vez pelean por los mismos puertos y emuladores.
-  for (const v of elegidas) resultados.push(await correrUna(raiz, v, { minutosMax: rapido ? MINUTOS_MAX_RAPIDA : Infinity }));
+  for (const v of elegidas) resultados.push(await correrUna(raiz, v, { minutosMax: rapido ? MINUTOS_MAX_RAPIDA : Infinity, archivos: cambios }));
   const ok = resultados.every((r) => r.ok);
   const marca = huella(raiz, todosLosCambios, verificaciones);
   if (ok && !archivos) {

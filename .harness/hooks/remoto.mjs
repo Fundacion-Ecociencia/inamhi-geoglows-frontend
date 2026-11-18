@@ -112,6 +112,63 @@ export function tokens(command) {
   return out;
 }
 
+/**
+ * Los comandos que un texto de shell ejecuta por dentro: `$( … )`, comillas
+ * invertidas y `<( … )` / `>( … )`. El shell los corre antes que el comando
+ * que los contiene, así que cada uno se revisa por su cuenta. Lo que va entre
+ * comillas simples no se expande y no cuenta; `$(( … ))` es aritmética.
+ * `capturado` dice si el resultado va a una variable (`VAR=$( … )`) y por
+ * tanto no sale en pantalla.
+ */
+export function sustituciones(texto) {
+  const out = [];
+  const n = texto.length;
+  let i = 0;
+  let dobles = false;
+  const cerrar = (desde) => {
+    let depth = 0;
+    for (let j = desde; j < n; j += 1) {
+      if (texto[j] === "(") depth += 1;
+      else if (texto[j] === ")") {
+        depth -= 1;
+        if (depth === 0) return j;
+      }
+    }
+    return -1;
+  };
+  while (i < n) {
+    const ch = texto[i];
+    if (ch === "\\") {
+      i += 2;
+    } else if (ch === '"') {
+      dobles = !dobles;
+      i += 1;
+    } else if (ch === "'" && !dobles) {
+      const fin = texto.indexOf("'", i + 1);
+      i = fin === -1 ? n : fin + 1;
+    } else if (ch === "`") {
+      const fin = texto.indexOf("`", i + 1);
+      out.push({ interior: fin === -1 ? null : texto.slice(i + 1, fin), capturado: false });
+      i = fin === -1 ? n : fin + 1;
+    } else if ((ch === "$" || ((ch === "<" || ch === ">") && !dobles)) && texto[i + 1] === "(") {
+      if (ch === "$" && texto[i + 2] === "(") {
+        // Aritmética: se salta entera, pero lo que tenga dentro como $( … ) sí se mira.
+        const fin = cerrar(i + 1);
+        if (fin !== -1) out.push(...sustituciones(texto.slice(i + 3, fin - 1)));
+        i = fin === -1 ? n : fin + 1;
+      } else {
+        const fin = cerrar(i + 1);
+        const capturado = ch === "$" && /(^|[\s;&|(])[A-Za-z_][A-Za-z0-9_]*="?$/.test(texto.slice(0, i));
+        out.push({ interior: fin === -1 ? null : texto.slice(i + 2, fin), capturado });
+        i = fin === -1 ? n : fin + 1;
+      }
+    } else {
+      i += 1;
+    }
+  }
+  return out;
+}
+
 /** Los comandos simples de un texto: listas de piezas separadas por operadores. */
 export function comandosSimples(command) {
   const list = [];
@@ -235,6 +292,9 @@ const LECTURA = new Set([
   "type", "nslookup", "dig", "ping", "top", "vmstat", "iostat", "last", "numfmt", "seq", "xargs", "tee",
 ]);
 
+/** Los únicos comandos que xargs puede lanzar sin preguntar: no escriben ni ejecutan, les llegue el argumento que les llegue. */
+const LECTURA_CON_CUALQUIER_ARGUMENTO = new Set(["grep", "egrep", "fgrep", "zgrep", "wc", "ls", "stat", "du", "head", "tail", "basename", "dirname", "md5sum", "sha256sum", "file", "echo", "readlink", "realpath"]);
+
 const GIT_LECTURA = new Set(["status", "log", "diff", "show", "rev-parse", "ls-files", "describe", "fetch", "blame", "shortlog", "rev-list", "ls-remote", "cat-file", "merge-base", "name-rev"]);
 const SYSTEMCTL_LECTURA = new Set(["status", "is-active", "is-enabled", "is-failed", "list-units", "list-timers", "list-unit-files", "show", "cat"]);
 const DOCKER_LECTURA = new Set(["ps", "logs", "inspect", "images", "stats", "version", "info", "top", "port"]);
@@ -334,8 +394,16 @@ function revisarComando(sc, config) {
     return archivos.every((a) => a === "/dev/null" || /^\/tmp\//.test(a)) ? null : pregunta("`tee` escribe un archivo en el servidor de producción.");
   }
   if (cmd === "xargs") {
-    const resto = args.filter((a) => !a.startsWith("-"));
-    return resto.length === 0 || (LECTURA.has(resto[0]) && resto[0] !== "xargs") ? null : pregunta("Ese xargs ejecuta un comando que el harness no reconoce como lectura.");
+    // Lo que xargs lanza recibe sus argumentos de la entrada, que no se ve: solo pasan los comandos
+    // que son lectura con cualquier argumento. `xargs tee`, `xargs cat` o `xargs sed` se preguntan.
+    let i = 0;
+    while (i < args.length && args[i].startsWith("-")) i += /^-[nILPdsE]$/.test(args[i]) ? 2 : 1;
+    const lanzado = args[i];
+    if (!lanzado) return pregunta("Ese xargs ejecuta como comandos lo que recibe por la entrada, y no se puede ver qué es.");
+    if (!LECTURA_CON_CUALQUIER_ARGUMENTO.has(lanzado)) {
+      return pregunta(`Ese xargs lanza \`${lanzado}\` con argumentos que llegan por la entrada y no se pueden revisar. Escribe el comando con sus argumentos a la vista.`);
+    }
+    return null;
   }
   if (LECTURA.has(cmd)) return null;
   return pregunta(`\`${cmd}\` no está en la lista de comandos de solo lectura. En producción, lo que escribe, borra, reinicia o mata procesos necesita confirmación para esa acción concreta.`);
@@ -354,15 +422,30 @@ const NUNCA_EN_SERVIDOR = [
  * Qué hacer con un comando que corre en un servidor de producción:
  * null (lectura, pasa), `ask` (lo confirma una persona) o `deny`.
  */
-export function clasificarRemoto(remoto, config = {}) {
+export function clasificarRemoto(remoto, config = {}, { capturado = false, nivel = 0 } = {}) {
   const texto = String(remoto);
   for (const [re, motivo] of NUNCA_EN_SERVIDOR) {
     if (re.test(texto)) return niega(motivo, "clon-del-servidor");
   }
-  const terceros = config?.produccion?.rutasDeTerceros ?? [];
   let peor = null;
-  for (const sc of comandosSimples(texto)) {
-    const palabras = sc.filter((t) => t.t === "w").map((t) => t.v);
+  // Primero lo que el shell ejecuta por dentro: `echo $(systemctl restart x)` reinicia antes de imprimir.
+  for (const s of sustituciones(texto)) {
+    const v = s.interior === null || nivel >= 4
+      ? pregunta("Ese comando lleva una sustitución que no se puede leer entera (sin cerrar o demasiado anidada).")
+      : clasificarRemoto(s.interior, config, { capturado: s.capturado, nivel: nivel + 1 });
+    if (v?.decision === "deny") return v;
+    if (v && !peor) peor = v;
+  }
+  const terceros = config?.produccion?.rutasDeTerceros ?? [];
+  const simples = comandosSimples(texto);
+  // Un archivo de secretos nombrado en una tubería que termina en xargs: `echo .env | xargs head`
+  // lo lee igual que `head .env`, aunque el nombre no sea argumento del lector.
+  const palabrasDe = (sc) => sc.filter((t) => t.t === "w").map((t) => t.v);
+  if (simples.some((sc) => sinPrefijos(palabrasDe(sc))[0] === "xargs") && simples.some((sc) => palabrasDe(sc).some((a) => isSecretFile(a)))) {
+    return niega("Esa tubería le pasa a xargs el nombre de un archivo de secretos, y su contenido saldría en la respuesta.", "leer-secretos");
+  }
+  for (const sc of simples) {
+    const palabras = palabrasDe(sc);
     const w = sinPrefijos(palabras);
     // Lo que mantiene otro equipo en el servidor: ni se pisa ni se restaura.
     const toca = w.slice(1).some((a) => !a.startsWith("-") && terceros.some((r) => a.replace(/\/+$/, "").endsWith(r.replace(/\/\*\*?$/, "").replace(/\/+$/, "")) || a.includes(`${r.replace(/\/\*\*?$/, "").replace(/\/+$/, "")}/`)));
@@ -370,7 +453,9 @@ export function clasificarRemoto(remoto, config = {}) {
     if (toca && escribeAhi && !(w[0] === "cp" && terceros.every((r) => !w[w.length - 1].includes(r.replace(/\/\*\*?$/, ""))))) {
       return niega(config?.produccion?.motivoTerceros ?? "Esa ruta la mantiene otro equipo directamente en el servidor. Cualquier cambio ahí se acuerda antes con ellos.", "ruta-de-terceros");
     }
-    if (w.some((a, i) => i > 0 && isSecretFile(a)) && ["cat", "less", "head", "tail", "grep", "egrep", "awk", "sed", "cut", "tac", "nl", "diff", "cmp", "jq", "tee", "xargs", "sort", "uniq", "wc"].includes(w[0]) && w[0] !== "wc") {
+    if (w.some((a, i) => i > 0 && isSecretFile(a)) && ["cat", "less", "head", "tail", "grep", "egrep", "awk", "sed", "cut", "tac", "nl", "diff", "cmp", "jq", "tee", "xargs", "sort", "uniq", "wc"].includes(w[0]) && w[0] !== "wc"
+      // Única salida: una variable tomada con `sed -n` dentro de una asignación (VAR=$(sed -n … .env)) no se imprime.
+      && !(capturado && w[0] === "sed" && w.includes("-n"))) {
       return niega("Ese archivo guarda secretos y su contenido saldría en la respuesta. Muestra solo longitudes, conteos o valores enmascarados.", "leer-secretos");
     }
     const v = revisarComando(sc, config);
