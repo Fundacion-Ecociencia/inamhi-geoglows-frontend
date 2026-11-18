@@ -42,7 +42,7 @@ fusiona y lo despliega el Especialista en Hidroinformática. Commits sin línea 
 - Despliegue: se copia sin `--delete` (en el servidor hay archivos que no vienen de este
   repositorio) y el `index.html` va al final.
 
-<!-- harness:inicio v0.2.1 · no edites esta parte: se actualiza con el instalador del harness -->
+<!-- harness:inicio v0.2.2 · no edites esta parte: se actualiza con el instalador del harness -->
 
 ## Reglas del harness
 

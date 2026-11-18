@@ -73,4 +73,5 @@ jobs:
         run: |
           base="origin/${{ github.base_ref || 'main' }}"
           archivos=$(git diff --name-only --diff-filter=ACMR "$base"...HEAD -- '*.sh')
-          [ -z "$archivos" ] || shellcheck --severity=error $archivos
+          # --shell=bash: una biblioteca que otro script carga con `source` no lleva shebang.
+          [ -z "$archivos" ] || shellcheck --severity=error --shell=bash $archivos
