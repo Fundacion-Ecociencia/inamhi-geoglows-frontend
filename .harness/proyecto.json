@@ -49,7 +49,7 @@
         "tsconfig*.json"
       ],
       "rapido": true,
-      "correr": "npx --no-install tsc -p tsconfig.app.json --noEmit"
+      "correr": "node scripts/ensure-carto-key.mjs && npx --no-install tsc -p tsconfig.app.json --noEmit"
     },
     {
       "nombre": "Compilación",
