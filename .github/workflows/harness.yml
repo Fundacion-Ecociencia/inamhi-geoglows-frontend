@@ -59,8 +59,12 @@ jobs:
       - name: Verificaciones que aplican a lo que cambió
         run: |
           base="origin/${{ github.base_ref || 'main' }}"
+          # Si el pull request cambia el harness o este workflow, corren todas:
+          # una actualización del harness tiene que mostrar que nada se rompe.
+          modo=""
+          if [ -n "$(git diff --name-only "$base"...HEAD -- .harness .github/workflows/harness.yml)" ]; then modo="--todo"; fi
           set +e
-          node .harness/bin/verificar.mjs --base "$base" | tee -a "$GITHUB_STEP_SUMMARY"
+          node .harness/bin/verificar.mjs --base "$base" $modo | tee -a "$GITHUB_STEP_SUMMARY"
           codigo=${PIPESTATUS[0]}
           # 3 = el proyecto todavía no declaró verificaciones: se avisa, no se falla.
           [ "$codigo" = 3 ] && exit 0
