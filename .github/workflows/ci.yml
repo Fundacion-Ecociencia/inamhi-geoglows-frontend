@@ -43,8 +43,16 @@ jobs:
           npx --no-install tsc -p tsconfig.app.json --noEmit
       - name: Compilación
         # El paquete inicial pasa del presupuesto de tamaño de angular.json y `ng build`
-        # termina con error por eso. Ese aviso es conocido; cualquier otro error falla.
+        # termina con error por eso. Ese error, y solo ese, es conocido: cualquier otro
+        # (tipos, plantillas, el presupuesto de estilos de un componente) hace fallar el paso.
         run: |
-          npm run build 2>&1 | tee /tmp/ng-build.log || true
-          grep -q 'Application bundle generation complete\|bundle initial exceeded maximum budget' /tmp/ng-build.log
-          ! grep -q 'error TS\|NG[0-9]\{4\}:.*error\|Could not resolve' /tmp/ng-build.log
+          set +e
+          npm run build 2>&1 | tee /tmp/ng-build.log
+          salida=${PIPESTATUS[0]}
+          set -e
+          conocido='bundle initial exceeded maximum budget'
+          otros=$(grep -F '[ERROR]' /tmp/ng-build.log | grep -v -F "$conocido" || true)
+          if [ -n "$otros" ]; then echo "::error::Errores de compilación"; echo "$otros"; exit 1; fi
+          if [ "$salida" != 0 ] && ! grep -q -F "$conocido" /tmp/ng-build.log; then
+            echo "::error::La compilación terminó con error y sin diagnóstico reconocible"; exit 1
+          fi
