@@ -185,6 +185,25 @@ export function guardarEstado(raiz, estado) {
   writeFileSync(ruta, `${JSON.stringify(estado, null, 2)}\n`);
 }
 
+const SENAL_DE_FALLA = /\bFALLA\b|\bFAIL(ED)?\b|Traceback|\bError\b|error:|Address already in use|✗/;
+
+/**
+ * Lo que se muestra de una verificación roja: las líneas que nombran la falla
+ * (con las dos que siguen) y el final de la salida. Un arnés largo falla a
+ * veces en un caso del principio, que el final solo no alcanza a mostrar.
+ */
+export function resumirError(salida, { maxFallas = 8 } = {}) {
+  const lineas = salida.trimEnd().split("\n");
+  const cola = lineas.slice(-MAX_LINEAS_ERROR);
+  const antes = lineas.slice(0, Math.max(0, lineas.length - MAX_LINEAS_ERROR));
+  const marcadas = [];
+  for (let i = 0; i < antes.length && marcadas.length < maxFallas; i += 1) {
+    if (SENAL_DE_FALLA.test(antes[i])) marcadas.push(antes.slice(i, i + 3).join("\n"));
+  }
+  if (!marcadas.length) return cola.join("\n");
+  return [`Líneas que nombran la falla (${marcadas.length}):`, ...marcadas, "[…]", "Final de la salida:", ...cola].join("\n");
+}
+
 /** Mata el comando y todo lo que lanzó (su grupo de procesos). */
 function matarGrupo(hijo, senal) {
   try {
@@ -234,7 +253,7 @@ export function correrUna(raiz, v, { minutosMax = Infinity } = {}) {
         ok,
         segundos: Math.round((Date.now() - inicio) / 1000),
         ...(motivo ? { motivo } : {}),
-        ...(ok ? {} : { final: salida.trimEnd().split("\n").slice(-MAX_LINEAS_ERROR).join("\n") }),
+        ...(ok ? {} : { final: resumirError(salida) }),
       });
     };
     const reloj = setTimeout(() => {
