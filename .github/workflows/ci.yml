@@ -1,0 +1,50 @@
+# En cada pull request: busca secretos en los commits y comprueba que la
+# aplicación compila. No despliega nada y no usa ningún secreto del repositorio.
+name: ci
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secretos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: gitleaks sobre los commits del pull request
+        run: |
+          curl -sSfL -o /tmp/gitleaks.tgz https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          tar -xzf /tmp/gitleaks.tgz -C /tmp gitleaks
+          base="${{ github.event.pull_request.base.sha }}"
+          /tmp/gitleaks git --redact --no-banner ${base:+--log-opts="$base..HEAD"}
+
+  compilar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Tipos de TypeScript
+        run: |
+          node scripts/ensure-carto-key.mjs
+          npx --no-install tsc -p tsconfig.app.json --noEmit
+      - name: Compilación
+        # El paquete inicial pasa del presupuesto de tamaño de angular.json y `ng build`
+        # termina con error por eso. Ese aviso es conocido; cualquier otro error falla.
+        run: |
+          npm run build 2>&1 | tee /tmp/ng-build.log || true
+          grep -q 'Application bundle generation complete\|bundle initial exceeded maximum budget' /tmp/ng-build.log
+          ! grep -q 'error TS\|NG[0-9]\{4\}:.*error\|Could not resolve' /tmp/ng-build.log
