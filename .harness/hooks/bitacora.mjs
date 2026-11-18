@@ -7,7 +7,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { agentName, describe, log, projectDir, readPayload, readProjectConfig, toolInput, toolName } from "./comun.mjs";
+import { agentName, describe, log, modeloDeTranscripcion, projectDir, readPayload, readProjectConfig, toolInput, toolName } from "./comun.mjs";
 
 function argument(name) {
   const index = process.argv.indexOf(name);
@@ -66,6 +66,8 @@ function main() {
       ...base,
       evento: "herramienta",
       herramienta: toolName(payload),
+      modelo: modeloDeTranscripcion(payload) ?? undefined,
+      esfuerzo: payload?.effort?.level,
       subagente: input?.subagent_type,
       archivo: input?.file_path ?? input?.notebook_path,
       resultado: outcome(payload),

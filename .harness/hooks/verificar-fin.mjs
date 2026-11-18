@@ -86,7 +86,7 @@ async function main() {
   }
   process.stdout.write(JSON.stringify({
     decision: "block",
-    reason: `Harness del harness: los cambios de esta sesión no pasan la verificación rápida. Arréglalos antes de terminar (intento ${d.intentos} de ${MAX_INTENTOS}).\n${texto}`,
+    reason: `Harness: los cambios de esta sesión no pasan la verificación rápida. Arréglalos antes de terminar (intento ${d.intentos} de ${MAX_INTENTOS}).\n${texto}`,
   }));
   process.exit(0);
 }

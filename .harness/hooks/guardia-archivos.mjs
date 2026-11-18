@@ -7,9 +7,9 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
-import { agentName, ask, deny, projectDir, readPayload, readProjectConfig, toolInput } from "./comun.mjs";
+import { agentName, ask, deny, modeloDeTranscripcion, projectDir, readPayload, readProjectConfig, toolInput } from "./comun.mjs";
 import { findSecrets, isLockfile, isSecretFile, realPath } from "./patrones.mjs";
-import { coincide, leerOrquestacion, modeloAlcanza, nivelDeRuta } from "./proyecto.mjs";
+import { coincide, esfuerzoAlcanza, leerOrquestacion, modeloAlcanza, nivelDeRuta } from "./proyecto.mjs";
 import { modeloDeSesion } from "./modelo.mjs";
 
 const START = "<!-- harness:inicio";
@@ -73,7 +73,7 @@ const OUTSIDE_OK = () => [tmpdir(), "/tmp", "/private/tmp", "/var/folders", "/pr
   join(homedir(), ".claude"), join(homedir(), ".codex"), join(homedir(), ".gemini")];
 
 /** Why this edit is refused (`deny`) or needs a person (`ask`), or null. */
-export function check(edit, projectRoot, { config = {}, modelo = null, orquestacion = null } = {}) {
+export function check(edit, projectRoot, { config = {}, modelo = null, esfuerzo = null, orquestacion = null } = {}) {
   const root = realPath(projectRoot);
   const absolute = realPath(resolve(root, edit.path));
   const rel = relative(root, absolute).split(sep).join("/");
@@ -128,15 +128,22 @@ export function check(edit, projectRoot, { config = {}, modelo = null, orquestac
   if (coincide(rel, config.produccion?.rutasDeTerceros)) {
     return { decision: "ask", rule: "ruta-de-terceros", reason: config.produccion?.motivoTerceros ?? "Esa ruta la mantiene otro equipo directamente en producción. Cualquier cambio ahí se acuerda antes con ellos." };
   }
-  // El modelo de la sesión tiene que alcanzar para el riesgo de la ruta.
+  // El modelo y el esfuerzo de la sesión tienen que alcanzar para el riesgo de la ruta.
   const nivel = nivelDeRuta(rel, config);
   const tabla = orquestacion ?? leerOrquestacion(root, config);
+  const pide = tabla.niveles[nivel];
   if (modelo && !modeloAlcanza(modelo, nivel, tabla)) {
-    const pide = tabla.niveles[nivel];
     return {
       decision: "ask",
       rule: "modelo-por-riesgo",
       reason: `${rel} es de riesgo ${nivel} y esta sesión corre con ${modelo}. Para esa ruta el proyecto pide ${pide.modeloMinimo} o superior (recomendado: ${pide.modelo}, esfuerzo ${pide.esfuerzo}). Cambia con /model y /effort, o delega el cambio a un subagente con ese modelo.`,
+    };
+  }
+  if (esfuerzo && !esfuerzoAlcanza(esfuerzo, nivel, tabla)) {
+    return {
+      decision: "ask",
+      rule: "esfuerzo-por-riesgo",
+      reason: `${rel} es de riesgo ${nivel} y esta sesión corre con esfuerzo ${esfuerzo}. Para esa ruta el proyecto pide ${pide.esfuerzoMinimo} como mínimo (recomendado: ${pide.esfuerzo}). Súbelo con /effort.`,
     };
   }
   return null;
@@ -147,9 +154,12 @@ function main() {
   const agent = agentName();
   const root = projectDir(payload);
   const config = readProjectConfig(root);
-  const modelo = modeloDeSesion(root, payload?.session_id ?? payload?.sessionId);
+  // El modelo: el de la última respuesta en la transcripción; si no se puede
+  // leer, el que guardó el hook de inicio o de cambio de modelo.
+  const modelo = modeloDeTranscripcion(payload) ?? modeloDeSesion(root, payload?.session_id ?? payload?.sessionId);
+  const esfuerzo = payload?.effort?.level ?? null;
   for (const edit of edits(payload)) {
-    const verdict = check(edit, root, { config, modelo });
+    const verdict = check(edit, root, { config, modelo, esfuerzo });
     if (!verdict) continue;
     if (verdict.decision === "deny") deny(root, payload, agent, verdict.reason, verdict.rule);
     ask(root, payload, agent, verdict.reason, verdict.rule);

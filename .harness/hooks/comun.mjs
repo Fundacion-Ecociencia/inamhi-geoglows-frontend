@@ -2,7 +2,7 @@
 // project, answering allow/deny/ask in a way both Claude Code and Codex
 // understand, and writing to the project's log (bitácora).
 
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { appendFileSync, closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import { redact } from "./patrones.mjs";
@@ -32,6 +32,69 @@ export function projectDir(payload) {
   } catch {
     return start;
   }
+}
+
+/** El modelo que nombra una línea de la transcripción, o null. */
+function modeloDeLinea(linea) {
+  if (!linea.includes("model")) return null;
+  let e;
+  try {
+    e = JSON.parse(linea);
+  } catch {
+    return null; // Una línea cortada al principio del tramo leído.
+  }
+  let modelo = null;
+  if (e?.type === "assistant" && e.isSidechain !== true) modelo = e.message?.model;
+  // La petición al modelo queda escrita antes que su respuesta: es lo único
+  // que hay en la primera acción de una sesión. Las peticiones auxiliares
+  // (subagentes, resúmenes, títulos) no cuentan.
+  else if (e?.type === "api-request" && !/agent|compact|summar|title|classif|hook/i.test(String(e.querySource ?? ""))) modelo = e.params?.model;
+  else if (e?.type === "attachment" && e.attachment?.type === "model") modelo = e.attachment.identity?.modelId;
+  return typeof modelo === "string" && modelo && !modelo.startsWith("<") ? modelo : null;
+}
+
+function ultimoModelo(ruta, desde, largo) {
+  let fd;
+  try {
+    fd = openSync(ruta, "r");
+    const buffer = Buffer.alloc(largo);
+    readSync(fd, buffer, 0, largo, desde);
+    const lineas = buffer.toString("utf8").split("\n");
+    for (let i = lineas.length - 1; i >= 0; i -= 1) {
+      const modelo = modeloDeLinea(lineas[i]);
+      if (modelo) return modelo;
+    }
+  } catch {
+    // Sin transcripción no se sabe.
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+  }
+  return null;
+}
+
+/**
+ * El modelo que está respondiendo en esta sesión. Claude Code no lo manda en
+ * la entrada de los hooks, pero lo deja escrito en la transcripción
+ * (`transcript_path`): en cada petición, en cada respuesta y al empezar. Se
+ * toma lo último, así que también se ve un cambio hecho con /model. Devuelve
+ * null si no se puede saber.
+ */
+export function modeloDeTranscripcion(payload, { cola = 2_000_000, maximo = 40_000_000 } = {}) {
+  const ruta = payload?.agent_transcript_path ?? payload?.transcript_path;
+  if (!ruta) return null;
+  let size;
+  try {
+    const fd = openSync(ruta, "r");
+    size = fstatSync(fd).size;
+    closeSync(fd);
+  } catch {
+    return null;
+  }
+  const largo = Math.min(size, cola);
+  const enLaCola = ultimoModelo(ruta, size - largo, largo);
+  if (enLaCola || size <= cola) return enLaCola;
+  const todo = Math.min(size, maximo);
+  return ultimoModelo(ruta, size - todo, todo);
 }
 
 export function toolName(payload) {

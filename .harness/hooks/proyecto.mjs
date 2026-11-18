@@ -74,10 +74,11 @@ export function nivelDeCambio(rutas, config) {
 
 const ORQUESTACION_MINIMA = {
   rangos: { haiku: 1, sonnet: 2, opus: 3, fable: 4, mythos: 4 },
+  esfuerzos: { low: 1, medium: 2, high: 3, xhigh: 4, max: 5 },
   niveles: {
-    bajo: { modelo: "sonnet", esfuerzo: "medium", modeloMinimo: "haiku" },
-    medio: { modelo: "opus", esfuerzo: "high", modeloMinimo: "sonnet" },
-    alto: { modelo: "opus", esfuerzo: "xhigh", modeloMinimo: "opus" },
+    bajo: { modelo: "sonnet", esfuerzo: "medium", modeloMinimo: "haiku", esfuerzoMinimo: "low" },
+    medio: { modelo: "opus", esfuerzo: "high", modeloMinimo: "sonnet", esfuerzoMinimo: "medium" },
+    alto: { modelo: "opus", esfuerzo: "xhigh", modeloMinimo: "opus", esfuerzoMinimo: "high" },
   },
 };
 
@@ -95,7 +96,13 @@ export function leerOrquestacion(root, config = {}) {
   const propio = config?.orquestacion ?? {};
   const niveles = {};
   for (const n of NIVELES) niveles[n] = { ...ORQUESTACION_MINIMA.niveles[n], ...(base.niveles?.[n] ?? {}), ...(propio.niveles?.[n] ?? {}) };
-  return { ...base, ...propio, rangos: { ...ORQUESTACION_MINIMA.rangos, ...(base.rangos ?? {}), ...(propio.rangos ?? {}) }, niveles };
+  return {
+    ...base,
+    ...propio,
+    rangos: { ...ORQUESTACION_MINIMA.rangos, ...(base.rangos ?? {}), ...(propio.rangos ?? {}) },
+    esfuerzos: { ...ORQUESTACION_MINIMA.esfuerzos, ...(base.esfuerzos ?? {}), ...(propio.esfuerzos ?? {}) },
+    niveles,
+  };
 }
 
 /** «claude-opus-5-5», «opus[1m]», «Opus 5.5» → «opus». Lo que no se reconoce, null. */
@@ -118,6 +125,14 @@ export function modeloAlcanza(modelo, nivel, orquestacion) {
   const minimo = orquestacion.niveles?.[nivel]?.modeloMinimo;
   if (!f || !minimo || !orquestacion.rangos[minimo]) return true;
   return orquestacion.rangos[f] >= orquestacion.rangos[minimo];
+}
+
+/** ¿El esfuerzo de la sesión alcanza para ese nivel? Uno que no se reconoce no se juzga. */
+export function esfuerzoAlcanza(esfuerzo, nivel, orquestacion) {
+  const tiene = orquestacion.esfuerzos?.[String(esfuerzo ?? "").toLowerCase()];
+  const pide = orquestacion.esfuerzos?.[orquestacion.niveles?.[nivel]?.esfuerzoMinimo];
+  if (!tiene || !pide) return true;
+  return tiene >= pide;
 }
 
 /** ¿[host] (con o sin usuario@) es uno de los servidores de producción? */

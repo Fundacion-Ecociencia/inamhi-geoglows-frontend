@@ -16,15 +16,24 @@ La tabla vive en `.harness/orquestacion.json`; el proyecto puede cambiar valores
 
 ## Cómo se hace cumplir
 
-- **Modelo.** El harness guarda el modelo de cada sesión (al empezar y en cada `/model`). Antes
-  de editar una ruta cuyo nivel pide un modelo mayor, la guardia de archivos pregunta. Antes de
-  bajar de modelo con cambios de riesgo sin entregar, pregunta. Un modelo que el harness no
-  reconoce no se juzga.
-- **Esfuerzo.** No llega a los hooks, así que se fija donde se puede: `effortLevel` en la
-  configuración del proyecto (`high` por defecto), y `effort` en cada skill y en cada subagente.
-  Para riesgo alto, sube con `/effort xhigh` antes de empezar.
+Antes de cada edición, la guardia de archivos compara el modelo y el esfuerzo de la sesión con
+los mínimos del nivel de la ruta:
+
+| Nivel | Modelo mínimo | Esfuerzo mínimo |
+|---|---|---|
+| Bajo | haiku | low |
+| Medio | sonnet | medium |
+| Alto | opus | high |
+
+- **Modelo.** Claude Code lo deja escrito en la transcripción de la sesión (en cada petición y
+  en cada respuesta); la guardia lee el último, así que ve también un cambio hecho con `/model`.
+  Si no alcanza, pregunta. Un modelo que el harness no reconoce no se juzga.
+- **Esfuerzo.** Llega en la entrada de cada hook. Si no alcanza, pregunta: se sube con
+  `/effort`. La configuración del proyecto trae `effortLevel: high` por defecto.
+- **Antes de bajar de modelo** con cambios de riesgo sin entregar, pregunta.
 - **Subagentes.** Cada uno trae su `model` y su `effort` en el encabezado; no heredan los de la
-  sesión.
+  sesión. Lo que edita un subagente se juzga con el modelo de la sesión que lo lanzó.
+- En una sesión sin persona delante (`claude -p`, CI) una pregunta equivale a una negativa.
 
 ## Qué subagente para qué tarea
 
